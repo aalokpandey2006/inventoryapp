@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Inventory System</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .login-container {
+            background-color: var(--surface-color);
+            padding: 3rem;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+        }
+        .login-container h2 {
+            margin-bottom: 2rem;
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>System Login</h2>
+        <form id="loginForm">
+            <div class="form-group" style="text-align: left;">
+                <label for="username">Username / Name</label>
+                <input type="text" id="username" required placeholder="e.g., Alice">
+            </div>
+            <div class="form-group" style="text-align: left;">
+                <label for="password">Password</label>
+                <input type="password" id="password" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn-primary btn-block">Access Inventory</button>
+        </form>
+    </div>
+
+    <script>
+        // Predefined valid users (Username: Password)
+        const validUsers = {
+            "aalok": "admin123",
+            "manager": "pass123",
+            "staff": "staff123"
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value.toLowerCase().trim();
+            const password = document.getElementById('password').value;
+            
+            if (validUsers[username] && validUsers[username] === password) {
+                // Save the user in the browser
+                localStorage.setItem('currentUser', username);
+                window.location.href = 'index.html';
+            } else {
+                alert("Invalid username or password!");
+            }
+        });
+    </script>
+</body>
+</html>

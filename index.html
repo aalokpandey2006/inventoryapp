@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Manager</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Firebase Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+        // Check if user is logged in
+        if (!localStorage.getItem('currentUser')) {
+            window.location.href = 'login.html';
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Inventory<span class="highlight">System</span></h1>
+            <p>Manage your stock.</p>
+            <div style="margin-top: 1rem; color: var(--text-secondary);">
+                Logged in as: <span id="currentUserDisplay" class="highlight" style="font-weight: 600;"></span>
+                <button id="logoutBtn" class="btn-danger" style="margin-left: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="controls">
+                <button id="addRowBtn" class="btn-primary">+ Add New Item</button>
+            </div>
+
+            <div class="table-container">
+                <table id="inventoryTable">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Image</th>
+                            <th>Product Quantity</th>
+                            <th>Client Info</th>
+                            <th>Delivery Details</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Added By</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryBody">
+                        <!-- Rows will be added here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for adding a new item -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Add New Item</h2>
+            <form id="addItemForm">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="category">Category</label>
+                        <select id="category" required style="width: 100%; padding: 0.75rem; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 1rem;">
+                            <option value="">Select Category...</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Furniture">Furniture</option>
+                            <option value="Stationery">Stationery</option>
+                            <option value="Software">Software</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="productName">Product Name</label>
+                        <select id="productName" required style="width: 100%; padding: 0.75rem; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 1rem;">
+                            <option value="">Select Product...</option>
+                            <option value="Smartphone">Smartphone</option>
+                            <option value="Laptop">Laptop</option>
+                            <option value="Office Chair">Office Chair</option>
+                            <option value="Desk">Desk</option>
+                            <option value="Printer">Printer</option>
+                            <option value="Custom">Custom/Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="imageUpload">Product Image</label>
+                    <input type="file" id="imageUpload" accept="image/*">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="clientName">Client Name</label>
+                        <input type="text" id="clientName" required placeholder="e.g., Acme Corp">
+                    </div>
+                    <div class="form-group">
+                        <label for="broughtBy">Who brought Client?</label>
+                        <input type="text" id="broughtBy" required placeholder="e.g., Sarah">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="purchaser">Purchased From</label>
+                        <input type="text" id="purchaser" required placeholder="e.g., Apple Store">
+                    </div>
+                    <div class="form-group">
+                        <label for="assignedDelivery">Assigned for Delivery</label>
+                        <input type="text" id="assignedDelivery" required placeholder="e.g., Mike">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="quantity">Quantity Delivered</label>
+                        <input type="number" id="quantity" required placeholder="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Priority</label>
+                        <select id="priority" required style="width: 100%; padding: 0.75rem; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 1rem;">
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary btn-block">Add to Inventory</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
