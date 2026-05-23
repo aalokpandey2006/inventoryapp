@@ -5,57 +5,141 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory Manager</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <!-- Firebase Compat SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script>
-        // Check if user is logged in
         if (!localStorage.getItem('currentUser')) {
             window.location.href = 'login.html';
         }
     </script>
 </head>
 <body>
+
+    <!-- Sidebar Overlay -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+    <!-- Slide-in Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">📦 Inventory</span>
+            <button id="closeSidebarBtn" class="sidebar-close-btn" aria-label="Close menu">✕</button>
+        </div>
+        <ul class="sidebar-nav">
+            <li class="nav-item active" data-section="delivery" id="nav-delivery">
+                <span class="nav-icon">🚚</span>
+                <span class="nav-label">Out for Delivery</span>
+            </li>
+            <li class="nav-item" data-section="warehouse" id="nav-warehouse">
+                <span class="nav-icon">🏭</span>
+                <span class="nav-label">Warehouse</span>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <p>Logged in as</p>
+            <span id="sidebarUser" class="sidebar-user"></span>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
     <div class="container">
         <header>
-            <h1>Inventory<span class="highlight">System</span></h1>
-            <p>Manage your stock.</p>
-            <div style="margin-top: 1rem; color: var(--text-secondary);">
-                Logged in as: <span id="currentUserDisplay" class="highlight" style="font-weight: 600;"></span>
-                <button id="logoutBtn" class="btn-danger" style="margin-left: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;">Logout</button>
+            <div class="header-left">
+                <button id="hamburgerBtn" class="hamburger-btn" aria-label="Open navigation menu">
+                    <span class="ham-bar"></span>
+                    <span class="ham-bar"></span>
+                    <span class="ham-bar"></span>
+                </button>
+                <h1>Inventory<span class="highlight">System</span></h1>
+            </div>
+            <div class="header-right">
+                <span class="header-section-label" id="headerSectionLabel">Out for Delivery</span>
+
+                <!-- Notification Bell -->
+                <div class="notif-bell-wrap">
+                    <button id="notifBellBtn" class="notif-bell-btn" onclick="toggleNotifPanel()" aria-label="Notifications">
+                        🔔
+                        <span id="notifBadge" class="notif-badge" style="display:none;">0</span>
+                    </button>
+                    <!-- Notification Panel -->
+                    <div id="notifPanel" class="notif-panel">
+                        <div class="notif-panel-header">
+                            <span class="notif-panel-title">🔔 Alerts</span>
+                            <button class="notif-clear-btn" onclick="clearAllNotifications()">Clear all</button>
+                        </div>
+                        <div id="notifList" class="notif-list">
+                            <div class="notif-empty">No notifications yet</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="logoutBtn" class="btn-danger">Logout</button>
             </div>
         </header>
 
-        <main>
-            <div class="controls">
-                <button id="addRowBtn" class="btn-primary">+ Add New Item</button>
+        <!-- ===========================
+             OUT FOR DELIVERY SECTION
+             =========================== -->
+        <section id="delivery-section" class="page-section active">
+
+            <!-- Sticky Stock Indicator Strip -->
+            <div class="stock-strip" id="stockStrip">
+                <div class="strip-title">📊 Stock</div>
+                <div class="strip-indicators" id="stripIndicators">
+                    <div class="indicator-skeleton">Loading stock data...</div>
+                </div>
             </div>
 
-            <div class="table-container">
-                <table id="inventoryTable">
-                    <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th>Image</th>
-                            <th>Product Quantity</th>
-                            <th>Client Info</th>
-                            <th>Delivery Details</th>
-                            <th>Priority</th>
-                            <th>Status</th>
-                            <th>Added By</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="inventoryBody">
-                        <!-- Rows will be added here dynamically -->
-                    </tbody>
-                </table>
+            <main>
+                <div class="controls">
+                    <button id="addRowBtn" class="btn-primary">+ Add New Item</button>
+                </div>
+                <div class="table-container">
+                    <table id="inventoryTable">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Image</th>
+                                <th>Product / Qty</th>
+                                <th>Client Info</th>
+                                <th>Delivery Details</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Added By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryBody">
+                            <!-- Rows added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </section>
+
+        <!-- ===========================
+             WAREHOUSE SECTION
+             =========================== -->
+        <section id="warehouse-section" class="page-section">
+            <div class="warehouse-header">
+                <div>
+                    <h2 class="warehouse-title">🏭 Warehouse <span class="highlight">Management</span></h2>
+                    <p class="warehouse-subtitle">Track stock levels, raw materials &amp; delivery pipeline per category.</p>
+                </div>
+                <button id="notifSettingsBtn" class="btn-notif">🔔 Alert Settings</button>
             </div>
-        </main>
+
+            <!-- Warehouse cards grid -->
+            <div class="warehouse-grid" id="warehouseGrid">
+                <!-- Cards generated by JS -->
+            </div>
+        </section>
     </div>
 
-    <!-- Modal for adding a new item -->
+    <!-- ===========================
+         ADD ITEM MODAL
+         =========================== -->
     <div id="addModal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
@@ -64,26 +148,18 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label for="category">Category</label>
-                        <select id="category" required style="width: 100%; padding: 0.75rem; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 1rem;">
+                        <select id="category" required style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;">
                             <option value="">Select Category...</option>
-                            <option value="Electronics">Electronics</option>
-                            <option value="Furniture">Furniture</option>
-                            <option value="Stationery">Stationery</option>
-                            <option value="Software">Software</option>
-                            <option value="Other">Other</option>
+                            <option value="Toilet Cleaner">Toilet Cleaner</option>
+                            <option value="Dishwasher">Dishwasher</option>
+                            <option value="Phenyl">Phenyl</option>
+                            <option value="Glass Cleaner">Glass Cleaner</option>
+                            <option value="Bathroom and Floor Cleaner">Bathroom and Floor Cleaner</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="productName">Product Name</label>
-                        <select id="productName" required style="width: 100%; padding: 0.75rem; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 1rem;">
-                            <option value="">Select Product...</option>
-                            <option value="Smartphone">Smartphone</option>
-                            <option value="Laptop">Laptop</option>
-                            <option value="Office Chair">Office Chair</option>
-                            <option value="Desk">Desk</option>
-                            <option value="Printer">Printer</option>
-                            <option value="Custom">Custom/Other</option>
-                        </select>
+                        <label for="productName">Fragrance</label>
+                        <input type="text" id="productName" required placeholder="Enter fragrance..." style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;box-sizing:border-box;">
                     </div>
                 </div>
 
@@ -91,7 +167,7 @@
                     <label for="imageUpload">Product Image</label>
                     <input type="file" id="imageUpload" accept="image/*">
                 </div>
-                
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label for="clientName">Client Name</label>
@@ -106,7 +182,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label for="purchaser">Purchased From</label>
-                        <input type="text" id="purchaser" required placeholder="e.g., Apple Store">
+                        <input type="text" id="purchaser" required placeholder="e.g., Supplier Name">
                     </div>
                     <div class="form-group">
                         <label for="assignedDelivery">Assigned for Delivery</label>
@@ -121,17 +197,51 @@
                     </div>
                     <div class="form-group">
                         <label for="priority">Priority</label>
-                        <select id="priority" required style="width: 100%; padding: 0.75rem; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 1rem;">
+                        <select id="priority" required style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;">
                             <option value="Low">Low</option>
                             <option value="Medium" selected>Medium</option>
                             <option value="High">High</option>
                         </select>
                     </div>
                 </div>
+
                 <button type="submit" class="btn-primary btn-block">Add to Inventory</button>
             </form>
         </div>
     </div>
+
+    <!-- ===========================
+         NOTIFICATION SETTINGS MODAL
+         =========================== -->
+    <div id="notifModal" class="modal">
+        <div class="modal-content">
+            <span class="close-notif-btn">&times;</span>
+            <h2>🔔 Alert Settings</h2>
+            <p style="color:var(--text-secondary);margin-bottom:1.5rem;font-size:0.9rem;line-height:1.6;">
+                Get notified when stock hits the minimum level or a batch hasn't been cleared within a week.
+            </p>
+            <form id="notifForm">
+                <div class="form-group">
+                    <label for="notifEmail">Admin Email</label>
+                    <input type="email" id="notifEmail" placeholder="admin@yourbusiness.com">
+                </div>
+                <div class="form-group">
+                    <label for="notifPhone">Mobile Number</label>
+                    <input type="tel" id="notifPhone" placeholder="+91 98765 43210">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="browserNotifToggle" style="width:auto;cursor:pointer;accent-color:var(--accent-color);">
+                        <span>Enable Browser Notifications</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn-primary btn-block" style="margin-top:1.5rem;">Save Settings</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
     <script src="script.js"></script>
 </body>
