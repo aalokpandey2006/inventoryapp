@@ -47,13 +47,170 @@ const DEFAULT_WAREHOUSE_DOC = {
 // ===========================
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ----- AUTH CHECK -----
+    // ----- AUTH CHECK & ROLE CHECK -----
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) { window.location.href = 'login.html'; return; }
 
     // Set sidebar user display
     const sidebarUser = document.getElementById('sidebarUser');
     if (sidebarUser) sidebarUser.textContent = currentUser;
+
+    window.receivesNotifications = true; // Default to true
+    window.isSuperAdmin = false; // Default to false
+
+    async function checkUserRole() {
+        try {
+            const userDoc = await db.collection('users').doc(currentUser.toLowerCase()).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                window.receivesNotifications = userData.receivesNotifications !== false;
+                window.isSuperAdmin = userData.role === 'super_admin';
+                
+                // Update UI based on role
+                const navIcon = document.getElementById('nav-admin-icon');
+                const navLabel = document.getElementById('nav-admin-label');
+                const sectionTitle = document.getElementById('admin-section-title');
+                const sectionSubtitle = document.getElementById('admin-section-subtitle');
+
+                if (window.isSuperAdmin) {
+                    if (navIcon) navIcon.textContent = '👑';
+                    if (navLabel) navLabel.textContent = 'Admin Panel';
+                    if (sectionTitle) sectionTitle.innerHTML = '👑 Admin <span class="highlight">Panel</span>';
+                    if (sectionSubtitle) sectionSubtitle.textContent = 'Manage system users, adjust access roles, and route notifications.';
+                    if (typeof SECTION_LABELS !== 'undefined') SECTION_LABELS.admin = '👑 Admin Panel';
+                } else {
+                    if (navIcon) navIcon.textContent = '👥';
+                    if (navLabel) navLabel.textContent = 'Users';
+                    if (sectionTitle) sectionTitle.innerHTML = '👥 User <span class="highlight">Directory</span>';
+                    if (sectionSubtitle) sectionSubtitle.textContent = 'View registered users and their access roles.';
+                    if (typeof SECTION_LABELS !== 'undefined') SECTION_LABELS.admin = '👥 Users';
+                }
+
+                // Initialize the table rendering (since it's now visible to everyone)
+                initAdminPanel();
+            }
+        } catch (err) {
+            console.error('Error fetching user role:', err);
+            initAdminPanel();
+        }
+    }
+    checkUserRole();
+
+    // ===========================
+    // ADMIN PANEL USER MANAGEMENT
+    // ===========================
+    let usersListener = null;
+
+    function initAdminPanel() {
+        if (usersListener) return;
+        const usersBody = document.getElementById('usersBody');
+        if (!usersBody) return;
+
+        // Dynamically adjust table headers based on role
+        const tableHeader = document.getElementById('usersTable')?.querySelector('thead tr');
+        if (tableHeader) {
+            if (window.isSuperAdmin) {
+                tableHeader.innerHTML = `
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Alerts Routing</th>
+                    <th>Registered At</th>
+                `;
+            } else {
+                tableHeader.innerHTML = `
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Registered At</th>
+                `;
+            }
+        }
+
+        usersBody.innerHTML = `<tr><td colspan="${window.isSuperAdmin ? 4 : 3}" style="text-align:center;color:var(--text-secondary);">Loading users...</td></tr>`;
+
+        usersListener = db.collection('users').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+            usersBody.innerHTML = '';
+            if (snapshot.empty) {
+                usersBody.innerHTML = `<tr><td colspan="${window.isSuperAdmin ? 4 : 3}" style="text-align:center;color:var(--text-secondary);">No registered users found.</td></tr>`;
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const user = doc.data();
+                const uId = doc.id;
+                const isSelf = uId === currentUser.toLowerCase();
+
+                const dateStr = user.createdAt
+                    ? (user.createdAt.toDate ? user.createdAt.toDate() : new Date(user.createdAt)).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'N/A';
+
+                const tr = document.createElement('tr');
+
+                if (window.isSuperAdmin) {
+                    const roleSelectHtml = `
+                        <select class="priority-badge ${user.role === 'super_admin' ? 'priority-high' : 'priority-low'}" 
+                                onchange="updateUserRole('${uId}', this.value)"
+                                ${isSelf ? 'disabled' : ''}
+                                style="cursor:${isSelf ? 'not-allowed' : 'pointer'};border:1px solid rgba(255,255,255,0.1);outline:none;border-radius:4px;padding:0.25rem 0.5rem;font-family:inherit;">
+                            <option value="user" ${user.role !== 'super_admin' ? 'selected' : ''}>User</option>
+                            <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
+                        </select>
+                    `;
+
+                    const notifEnabled = user.receivesNotifications !== false;
+                    const notifSelectHtml = `
+                        <select class="priority-badge ${notifEnabled ? 'priority-medium' : 'priority-low'}" 
+                                onchange="updateUserNotif('${uId}', this.value === 'true')"
+                                style="cursor:pointer;border:1px solid rgba(255,255,255,0.1);outline:none;border-radius:4px;padding:0.25rem 0.5rem;font-family:inherit;">
+                            <option value="true" ${notifEnabled ? 'selected' : ''}>Receive Alerts</option>
+                            <option value="false" ${!notifEnabled ? 'selected' : ''}>Muted</option>
+                        </select>
+                    `;
+
+                    tr.innerHTML = `
+                        <td data-label="Username" style="font-weight:600;color:var(--text-primary);">${user.username} ${isSelf ? ' <span style="font-size:0.75rem;opacity:0.65;font-weight:normal;">(You)</span>' : ''}</td>
+                        <td data-label="Role">${roleSelectHtml}</td>
+                        <td data-label="Alerts">${notifSelectHtml}</td>
+                        <td data-label="Registered">${dateStr}</td>
+                    `;
+                } else {
+                    const roleBadge = user.role === 'super_admin'
+                        ? `<span class="priority-badge priority-high">Super Admin</span>`
+                        : `<span class="priority-badge priority-low">User</span>`;
+
+                    tr.innerHTML = `
+                        <td data-label="Username" style="font-weight:600;color:var(--text-primary);">${user.username} ${isSelf ? ' <span style="font-size:0.75rem;opacity:0.65;font-weight:normal;">(You)</span>' : ''}</td>
+                        <td data-label="Role">${roleBadge}</td>
+                        <td data-label="Registered">${dateStr}</td>
+                    `;
+                }
+
+                usersBody.appendChild(tr);
+            });
+        }, err => {
+            console.error('Users snapshot error:', err);
+            usersBody.innerHTML = `<tr><td colspan="${window.isSuperAdmin ? 4 : 3}" style="text-align:center;color:var(--danger-color);">Error loading users. Access Denied.</td></tr>`;
+        });
+    }
+
+    window.updateUserRole = async (userId, newRole) => {
+        try {
+            await db.collection('users').doc(userId).update({ role: newRole });
+            showToast('Role Updated ✅', `User role updated to ${newRole}.`, 'success');
+        } catch (err) {
+            console.error('Role update error:', err);
+            showToast('Update Failed', 'Failed to update user role.', 'danger');
+        }
+    };
+
+    window.updateUserNotif = async (userId, receivesNotif) => {
+        try {
+            await db.collection('users').doc(userId).update({ receivesNotifications: receivesNotif });
+            showToast('Alerts Updated ✅', `Alert setting updated.`, 'success');
+        } catch (err) {
+            console.error('Alert config update error:', err);
+            showToast('Update Failed', 'Failed to update alert routing.', 'danger');
+        }
+    };
 
     // ===========================
     // NOTIFICATION BELL SYSTEM
@@ -62,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let unreadCount  = 0;
 
     function addNotification(type, title, message) {
+        if (window.receivesNotifications === false) return; // Muted for current user
         notifStore.unshift({ id: Date.now(), type, title, message, time: new Date(), read: false });
         unreadCount++;
         updateBellBadge();
@@ -176,6 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const SECTION_LABELS = {
         delivery:  '🚚 Out for Delivery',
         warehouse: '🏭 Warehouse',
+        admin:     '👑 Admin Panel'
     };
 
     navItems.forEach(item => {
@@ -844,6 +1003,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === addModal) { addModal.style.display = 'none'; addItemForm.reset(); }
     });
 
+    // Category mapping helper
+    function getCategoryId(categoryName) {
+        if (!categoryName) return '';
+        const nameLower = categoryName.toLowerCase().trim();
+        if (nameLower.includes('toilet')) return 'toilet_cleaner';
+        if (nameLower.includes('dish')) return 'dishwasher';
+        if (nameLower.includes('phenyl')) return 'phenyl';
+        if (nameLower.includes('glass')) return 'glass_cleaner';
+        if (nameLower.includes('floor') || nameLower.includes('bathroom')) return 'bathroom_floor_cleaner';
+        return '';
+    }
+
     // Form submission
     if (addItemForm) {
         addItemForm.addEventListener('submit', async e => {
@@ -869,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const order = inventory.length > 0 ? inventory[inventory.length - 1].order + 100 : 100;
 
             const newItem = {
-                category, productName, purchaser, quantity,
+                category, productName, purchaser, quantity: parseFloat(quantity) || 0,
                 clientName, broughtBy, assignedDelivery, priority,
                 status: 'Undelivered',
                 addedBy: currentUser,
@@ -880,13 +1051,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 await db.collection('inventory').add(newItem);
+                
+                // Increment outForDelivery in warehouse
+                const catId = getCategoryId(category);
+                if (catId) {
+                    const qty = parseFloat(quantity) || 0;
+                    await db.collection('warehouse').doc(catId).update({
+                        outForDelivery: firebase.firestore.FieldValue.increment(qty),
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastUpdatedBy: currentUser
+                    });
+                }
+
                 addModal.style.display = 'none';
                 addItemForm.reset();
+                showToast('Task Added ✅', `Added delivery task for ${productName}.`, 'success');
             } catch (err) {
                 console.error(err);
-                alert('Error adding item to database. Please try again.');
+                showToast('Error', 'Failed to add task to database.', 'danger');
             } finally {
-                submitBtn.textContent = 'Add to Inventory';
+                submitBtn.textContent = 'Add New Task';
                 submitBtn.disabled = false;
             }
         });
@@ -894,7 +1078,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Status, priority, delete, reorder actions
     window.markDelivered = async id => {
-        await db.collection('inventory').doc(id).update({ status: 'Completed' });
+        try {
+            const doc = await db.collection('inventory').doc(id).get();
+            if (!doc.exists) return;
+            const item = doc.data();
+            if (item.status === 'Completed') return;
+
+            // Mark completed
+            await db.collection('inventory').doc(id).update({ status: 'Completed' });
+
+            // Subtract from warehouse remaining stock and outForDelivery
+            const catId = getCategoryId(item.category);
+            if (catId) {
+                const qty = parseFloat(item.quantity) || 0;
+                await db.collection('warehouse').doc(catId).update({
+                    stockRemaining: firebase.firestore.FieldValue.increment(-qty),
+                    outForDelivery: firebase.firestore.FieldValue.increment(-qty),
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastUpdatedBy: currentUser
+                });
+                
+                // Allow notification alerts to check again
+                notifCheckedOnce.delete(catId);
+            }
+            showToast('Delivery Done ✓', 'Warehouse stock and delivery pipeline updated.', 'success');
+        } catch (err) {
+            console.error('Error marking delivery complete:', err);
+            showToast('Error', 'Failed to complete delivery task.', 'danger');
+        }
     };
 
     window.updatePriority = async (id, newPriority) => {
@@ -902,8 +1113,31 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.deleteItem = async id => {
-        if (confirm('Are you sure you want to delete this item?')) {
-            await db.collection('inventory').doc(id).delete();
+        if (confirm('Are you sure you want to delete this task?')) {
+            try {
+                const doc = await db.collection('inventory').doc(id).get();
+                if (!doc.exists) return;
+                const item = doc.data();
+                
+                await db.collection('inventory').doc(id).delete();
+
+                // If not completed yet, decrement outForDelivery
+                if (item.status !== 'Completed') {
+                    const catId = getCategoryId(item.category);
+                    if (catId) {
+                        const qty = parseFloat(item.quantity) || 0;
+                        await db.collection('warehouse').doc(catId).update({
+                            outForDelivery: firebase.firestore.FieldValue.increment(-qty),
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                            lastUpdatedBy: currentUser
+                        });
+                    }
+                }
+                showToast('Task Deleted', 'Task removed successfully.', 'success');
+            } catch (err) {
+                console.error('Error deleting task:', err);
+                showToast('Error', 'Failed to delete task.', 'danger');
+            }
         }
     };
 
@@ -938,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             inventoryBody.innerHTML = `
                 <tr>
                     <td colspan="9" style="text-align:center;color:var(--text-secondary);padding:2rem;">
-                        No items found. Click <strong>+ Add New Item</strong> to get started.
+                        No items found. Click <strong>+ Add New Task</strong> to get started.
                     </td>
                 </tr>`;
             return;
