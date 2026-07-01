@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - Inventory System</title>
-    <link rel="stylesheet" href="style.css">
+    <link class="style-link" rel="stylesheet" href="style.css">
+    <link class="style-link" rel="stylesheet" href="worksync-theme.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     
     <!-- Firebase Compat SDK -->
@@ -19,17 +20,18 @@
             height: 100vh;
             margin: 0;
             padding: 1rem;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
         }
         .auth-container {
-            background-color: rgba(30, 34, 42, 0.85);
-            backdrop-filter: blur(16px);
+            background-color: var(--surface-color);
             padding: 3rem 2.5rem;
             border-radius: 16px;
             width: 100%;
             max-width: 420px;
             text-align: center;
             border: 1px solid var(--border-color);
-            box-shadow: 0 25px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.6);
         }
         .auth-container h2 {
             margin-bottom: 0.5rem;
@@ -66,7 +68,7 @@
         .form-group input:focus {
             outline: none;
             border-color: var(--accent-color);
-            box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+            box-shadow: 0 0 0 3px rgba(45,212,191,0.1);
         }
         .btn-block {
             width: 100%;
@@ -104,7 +106,7 @@
             width: 100%;
         }
         .password-input-wrapper input {
-            padding-right: 2.75rem !important;
+            padding-right: 3rem !important;
         }
         .password-toggle-btn {
             position: absolute;
@@ -113,7 +115,7 @@
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
-            font-size: 1.15rem;
+            font-size: 0.8rem;
             padding: 4px;
             display: flex;
             align-items: center;
@@ -160,6 +162,11 @@
     </div>
 
     <script>
+        // Redirect if already logged in
+        if (localStorage.getItem('currentUser')) {
+            window.location.href = 'index.html';
+        }
+
         function togglePasswordVisibility(id, btn) {
             const input = document.getElementById(id);
             if (!input) return;
@@ -235,7 +242,7 @@
                 // Register user
                 await db.collection('users').doc(username.toLowerCase()).set({
                     username: username,
-                    password: password, // Note: In a real app, never store plain text passwords!
+                    password: password,
                     role: role,
                     receivesNotifications: true,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()

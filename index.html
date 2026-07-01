@@ -3,174 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Manager</title>
+    <title>Inventory Manager - WorkSync Enterprise</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="worksync-theme.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Diagnostic Error Tracker -->
+    <script>
+        function showDiagnosticError(message) {
+            const errDiv = document.getElementById('globalErrorAlert') || document.createElement('div');
+            errDiv.id = 'globalErrorAlert';
+            errDiv.style = 'position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:1rem;z-index:99999;font-family:monospace;font-size:0.9rem;box-shadow:0 4px 10px rgba(0,0,0,0.5);text-align:left;';
+            errDiv.innerHTML = '<strong>JavaScript Error Detected:</strong><br>' + message;
+            document.body.appendChild(errDiv);
+        }
+        window.addEventListener('error', function(e) {
+            showDiagnosticError(e.message + ' (line ' + e.lineno + ' in ' + e.filename.split("/").pop() + ')');
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            showDiagnosticError('Promise Rejection: ' + (e.reason ? (e.reason.message || e.reason) : 'Unknown reason'));
+        });
+    </script>
+    
     <!-- Firebase Compat SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script>
-        if (!localStorage.getItem('currentUser')) {
-            window.location.href = 'login.html';
-        }
-    </script>
 </head>
 <body>
 
-    <!-- Sidebar Overlay -->
-    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+    <!-- ===========================
+         APP CONTAINER (Main Dashboard)
+         =========================== -->
+    <div id="app-wrapper" style="display: none;">
+        <!-- Sidebar Overlay -->
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
-    <!-- Slide-in Sidebar -->
-    <nav id="sidebar" class="sidebar">
-        <div class="sidebar-header">
-            <span class="sidebar-logo">📦 Inventory</span>
-            <button id="closeSidebarBtn" class="sidebar-close-btn" aria-label="Close menu">✕</button>
-        </div>
-        <ul class="sidebar-nav">
-            <li class="nav-item active" data-section="delivery" id="nav-delivery">
-                <span class="nav-icon">🚚</span>
-                <span class="nav-label">Out for Delivery</span>
-            </li>
-            <li class="nav-item" data-section="warehouse" id="nav-warehouse">
-                <span class="nav-icon">🏭</span>
-                <span class="nav-label">Warehouse</span>
-            </li>
-            <li class="nav-item" data-section="admin" id="nav-admin">
-                <span class="nav-icon" id="nav-admin-icon">👥</span>
-                <span class="nav-label" id="nav-admin-label">Users</span>
-            </li>
-        </ul>
-        <div class="sidebar-footer">
-            <p>Logged in as</p>
-            <span id="sidebarUser" class="sidebar-user"></span>
-        </div>
-    </nav>
-
-    <!-- Main Container -->
-    <div class="container">
-        <header>
-            <div class="header-left">
-                <button id="hamburgerBtn" class="hamburger-btn" aria-label="Open navigation menu">
-                    <span class="ham-bar"></span>
-                    <span class="ham-bar"></span>
-                    <span class="ham-bar"></span>
-                </button>
-                <h1>Inventory<span class="highlight">System</span></h1>
+        <!-- Slide-in Sidebar -->
+        <nav id="sidebar" class="sidebar">
+            <div>
+                <div class="sidebar-header">
+                    <span class="sidebar-logo">Inventory</span>
+                    <button id="closeSidebarBtn" class="sidebar-close-btn" aria-label="Close menu" style="color: var(--text-muted); background: none; border: none; font-size: 1.2rem; cursor: pointer;">✕</button>
+                </div>
+                <ul class="sidebar-nav">
+                    <li class="nav-item active" data-section="delivery" id="nav-delivery">
+                        <span class="nav-label">Out for Delivery</span>
+                    </li>
+                    <li class="nav-item" data-section="warehouse" id="nav-warehouse">
+                        <span class="nav-label">Warehouse</span>
+                    </li>
+                    <li class="nav-item" data-section="admin" id="nav-admin">
+                        <span class="nav-label" id="nav-admin-label">Users</span>
+                    </li>
+                    <li class="nav-item" data-section="design" id="nav-design" style="display: none;">
+                        <span class="nav-label">Design System</span>
+                    </li>
+                    <li class="nav-item" data-section="tasks" id="nav-tasks" style="display: none;">
+                        <span class="nav-label">Task Tracker</span>
+                    </li>
+                </ul>
             </div>
-            <div class="header-right">
-                <span class="header-section-label" id="headerSectionLabel">Out for Delivery</span>
+            <div class="sidebar-footer">
+                <p>Logged in as</p>
+                <span id="sidebarUser" class="sidebar-user" style="color: var(--text-primary); font-weight: 600;"></span>
+            </div>
+        </nav>
 
-                <!-- Notification Bell -->
-                <div class="notif-bell-wrap">
-                    <button id="notifBellBtn" class="notif-bell-btn" onclick="toggleNotifPanel()" aria-label="Notifications">
-                        🔔
-                        <span id="notifBadge" class="notif-badge" style="display:none;">0</span>
+        <!-- Main Container -->
+        <div class="container">
+            <header>
+                <div class="header-left">
+                    <button id="hamburgerBtn" class="hamburger-btn" aria-label="Open navigation menu" style="display: none; border: 1px solid var(--border-color); background: var(--surface-color); border-radius: 4px; color: var(--text-primary); padding: 0.35rem 0.65rem; cursor: pointer;">
+                        Menu
                     </button>
-                    <!-- Notification Panel -->
-                    <div id="notifPanel" class="notif-panel">
-                        <div class="notif-panel-header">
-                            <span class="notif-panel-title">🔔 Alerts</span>
-                            <button class="notif-clear-btn" onclick="clearAllNotifications()">Clear all</button>
+                    <h1>Inventory <span class="highlight">System</span></h1>
+                </div>
+                <div class="header-right">
+                    <span class="header-section-label" id="headerSectionLabel">Out for Delivery</span>
+
+                    <!-- Notification Area -->
+                    <div class="notif-bell-wrap">
+                        <button id="notifBellBtn" class="notif-bell-btn" onclick="toggleNotifPanel()" aria-label="Notifications" style="background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 0.9rem;">
+                            Alerts
+                            <span id="notifBadge" class="notif-badge" style="display:none;">0</span>
+                        </button>
+                        <!-- Notification Panel -->
+                        <div id="notifPanel" class="notif-panel">
+                            <div class="notif-panel-header">
+                                <span class="notif-panel-title">Alerts</span>
+                                <button class="notif-clear-btn" onclick="clearAllNotifications()">Clear all</button>
+                            </div>
+                            <div id="notifList" class="notif-list">
+                                <div class="notif-empty">No notifications yet</div>
+                            </div>
                         </div>
-                        <div id="notifList" class="notif-list">
-                            <div class="notif-empty">No notifications yet</div>
+                    </div>
+
+                    <button id="logoutBtn" class="btn-danger">Logout</button>
+                </div>
+            </header>
+
+            <!-- ===========================
+                 OUT FOR DELIVERY SECTION
+                 =========================== -->
+            <section id="delivery-section" class="page-section active">
+                <!-- Sticky Stock Indicator Strip -->
+                <div class="stock-strip" id="stockStrip">
+                    <div class="strip-indicators" id="stripIndicators">
+                        <div class="indicator-skeleton">Loading stock data...</div>
+                    </div>
+                </div>
+
+                <main>
+                    <div class="controls">
+                        <button id="addRowBtn" class="btn-primary">+ Add New Task</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="inventoryTable">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Image</th>
+                                    <th>Product / Qty</th>
+                                    <th>Client Info</th>
+                                    <th>Delivery Details</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Added By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryBody">
+                                <!-- Rows added dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </main>
+            </section>
+
+            <!-- ===========================
+                 WAREHOUSE SECTION
+                 =========================== -->
+            <section id="warehouse-section" class="page-section">
+                <div class="warehouse-header">
+                    <div>
+                        <h2 class="warehouse-title">Warehouse Management</h2>
+                        <p class="warehouse-subtitle">Track stock levels, raw materials &amp; delivery pipeline per category.</p>
+                    </div>
+                    <button id="notifSettingsBtn" class="btn-notif">Alert Settings</button>
+                </div>
+
+                <!-- Warehouse cards grid -->
+                <div class="warehouse-grid" id="warehouseGrid">
+                    <!-- Cards generated by JS -->
+                </div>
+            </section>
+
+            <!-- ===========================
+                 ADMIN PANEL SECTION (Users)
+                 =========================== -->
+            <section id="admin-section" class="page-section">
+                <div class="warehouse-header">
+                    <div>
+                        <h2 class="warehouse-title" id="admin-section-title">Admin Panel</h2>
+                        <p class="warehouse-subtitle" id="admin-section-subtitle">Manage system users, adjust access roles, and route notifications.</p>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Alerts Routing</th>
+                                <th>Registered At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersBody">
+                            <!-- Loaded dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ===========================
+                 DESIGN SYSTEM SECTION
+                 =========================== -->
+            <section id="design-section" class="page-section">
+                <div class="warehouse-header">
+                    <div>
+                        <h2 class="warehouse-title">Design System</h2>
+                        <p class="warehouse-subtitle">Edit the configuration of the WorkSync Enterprise design system.</p>
+                    </div>
+                </div>
+
+                <div class="table-container" style="padding: 1.5rem;">
+                    <textarea id="designEditor" style="width: 100%; height: 400px; padding: 1rem; font-family: monospace; font-size: 14px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; outline: none;"></textarea>
+                    <button id="saveDesignBtn" class="btn-primary" style="margin-top: 1rem;">Save Design Settings</button>
+                </div>
+            </section>
+
+            <!-- ===========================
+                 TASK TRACKER SECTION (New Calendar Hub)
+                 =========================== -->
+            <section id="tasks-section" class="page-section">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h2 class="warehouse-title">Team Performance Hub</h2>
+                        <p class="warehouse-subtitle">Work cycles and task velocity for Project Alpha</p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem;">
+                        <div class="metric-box">
+                            <div class="metric-label">Total Hours</div>
+                            <div class="metric-value" id="trackerTotalHours">0.0</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Tasks Done</div>
+                            <div class="metric-value" id="trackerTasksDone">0</div>
+                        </div>
+                        <button class="btn-primary" id="trackerLogHoursBtn" style="padding: 0.5rem 1rem; font-weight: 600; font-size: 0.85rem; border-radius: 6px;">Log New Hours</button>
+                    </div>
+                </div>
+
+                <!-- Grid Navigation & Filters -->
+                <div class="grid-controls-row">
+                    <div class="grid-navigation">
+                        <button class="btn-stepper" id="prevWeekBtn">&lt;</button>
+                        <span class="date-range-label" id="dateRangeLabel">Oct 23 - Oct 29, 2023</span>
+                        <button class="btn-stepper" id="nextWeekBtn">&gt;</button>
+                        <button class="btn-today" id="todayBtn">Today</button>
+                    </div>
+
+                    <div class="filter-group">
+                        <span class="filter-label">Filter by Day:</span>
+                        <select class="select-filter" id="dayFilter">
+                            <option value="all">All Days</option>
+                        </select>
+                    </div>
+
+                    <div class="grid-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot in-progress"></span>
+                            <span>In Progress</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot completed"></span>
+                            <span>Completed</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot blocked"></span>
+                            <span>Blocked</span>
                         </div>
                     </div>
                 </div>
 
-                <button id="logoutBtn" class="btn-danger">Logout</button>
-            </div>
-        </header>
-
-        <!-- ===========================
-             OUT FOR DELIVERY SECTION
-             =========================== -->
-        <section id="delivery-section" class="page-section active">
-
-            <!-- Sticky Stock Indicator Strip -->
-            <div class="stock-strip" id="stockStrip">
-                <div class="strip-indicators" id="stripIndicators">
-                    <div class="indicator-skeleton">Loading stock data...</div>
-                </div>
-            </div>
-
-            <main>
-                <div class="controls">
-                    <button id="addRowBtn" class="btn-primary">+ Add New Task</button>
-                </div>
-                <div class="table-container">
-                    <table id="inventoryTable">
+                <!-- Calendar Work Grid -->
+                <div class="grid-scroll-container">
+                    <table class="calendar-grid-table">
                         <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th>Image</th>
-                                <th>Product / Qty</th>
-                                <th>Client Info</th>
-                                <th>Delivery Details</th>
-                                <th>Priority</th>
-                                <th>Status</th>
-                                <th>Added By</th>
-                                <th>Actions</th>
+                            <tr id="gridHeaderRow">
+                                <th>Date</th>
+                                <!-- Member columns load dynamically -->
                             </tr>
                         </thead>
-                        <tbody id="inventoryBody">
-                            <!-- Rows added dynamically -->
+                        <tbody id="gridBody">
+                            <!-- Rows loaded dynamically -->
                         </tbody>
                     </table>
                 </div>
-            </main>
-        </section>
 
-        <!-- ===========================
-             WAREHOUSE SECTION
-             =========================== -->
-        <section id="warehouse-section" class="page-section">
-            <div class="warehouse-header">
-                <div>
-                    <h2 class="warehouse-title">🏭 Warehouse <span class="highlight">Management</span></h2>
-                    <p class="warehouse-subtitle">Track stock levels, raw materials &amp; delivery pipeline per category.</p>
+                <!-- Control Buttons for extending calendar -->
+                <div class="grid-actions-row">
+                    <button class="btn-grid-action" id="addDateRowBtn">+ Add Date Row</button>
+                    <button class="btn-grid-action" id="addMemberBtn">+ Add Member</button>
                 </div>
-                <button id="notifSettingsBtn" class="btn-notif">🔔 Alert Settings</button>
-            </div>
 
-            <!-- Warehouse cards grid -->
-            <div class="warehouse-grid" id="warehouseGrid">
-                <!-- Cards generated by JS -->
-            </div>
-        </section>
-
-        <!-- ===========================
-             ADMIN PANEL SECTION
-             =========================== -->
-        <section id="admin-section" class="page-section">
-            <div class="warehouse-header">
-                <div>
-                    <h2 class="warehouse-title" id="admin-section-title">👑 Admin <span class="highlight">Panel</span></h2>
-                    <p class="warehouse-subtitle" id="admin-section-subtitle">Manage system users, adjust access roles, and route notifications.</p>
+                <!-- Workload Comparison Section -->
+                <div class="comparison-section">
+                    <h3 class="comparison-title">Team Workload Comparison</h3>
+                    <div class="comparison-list" id="comparisonList">
+                        <!-- Loaded dynamically -->
+                    </div>
                 </div>
-            </div>
 
-            <div class="table-container">
-                <table id="usersTable">
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>Role</th>
-                            <th>Alerts Routing</th>
-                            <th>Registered At</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersBody">
-                        <!-- Loaded dynamically via JS -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                <!-- Recent Logs Section -->
+                <div class="recent-logs-section">
+                    <div class="recent-logs-header">
+                        <h3>Recent Logs</h3>
+                    </div>
+                    <table class="logs-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Task</th>
+                                <th>Member</th>
+                                <th>Status</th>
+                                <th>Hours</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentLogsBody">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- ===========================
-         ADD TASK MODAL
+         MODALS
          =========================== -->
+    <!-- Log Hours Modal -->
+    <div id="trackerAddModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeTrackerAddModalBtn">&times;</span>
+            <h2>Log Work Details</h2>
+            <form id="trackerAddForm">
+                <div class="form-group">
+                    <label for="taskMemberSelect">Team Member</label>
+                    <select id="taskMemberSelect" required>
+                        <option value="">Select Member...</option>
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskDateSelect">Work Date</label>
+                    <select id="taskDateSelect" required>
+                        <option value="">Select Date Row...</option>
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskName">Task Name</label>
+                    <input type="text" id="taskName" required>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="taskHours">Hours Logged</label>
+                        <input type="number" id="taskHours" step="0.5" min="0.5" max="24" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskStatus">Status</label>
+                        <select id="taskStatus" required>
+                            <option value="completed" selected>Completed</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="blocked">Blocked</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" class="btn-modal-submit" style="flex: 2;">Save Log Entry</button>
+                    <button type="button" class="btn-danger" id="deleteTaskBtn" style="flex: 1; display: none; padding: 0.6rem; font-weight: 600; font-size: 0.85rem; border-radius: 4px;">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Member Modal -->
+    <div id="trackerMemberModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeTrackerMemberModalBtn">&times;</span>
+            <h2>Add Team Member</h2>
+            <form id="trackerMemberForm">
+                <div class="form-group">
+                    <label for="memberName">Full Name</label>
+                    <input type="text" id="memberName" required>
+                </div>
+                <div class="form-group">
+                    <label for="memberRole">Role Description</label>
+                    <input type="text" id="memberRole" required>
+                </div>
+                <button type="submit" class="btn-modal-submit">Add to Team</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Task/Edit Row Dialog (for standard Inventory) -->
     <div id="addModal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
@@ -193,12 +403,10 @@
                         <input type="text" id="productName" required placeholder="Enter fragrance..." style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;box-sizing:border-box;">
                     </div>
                 </div>
-
                 <div class="form-group">
                     <label for="imageUpload">Product Image</label>
                     <input type="file" id="imageUpload" accept="image/*">
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label for="clientName">Client Name</label>
@@ -209,7 +417,6 @@
                         <input type="text" id="broughtBy" required placeholder="e.g., Sarah">
                     </div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label for="purchaser">Purchased From</label>
@@ -220,7 +427,6 @@
                         <input type="text" id="assignedDelivery" required placeholder="e.g., Mike">
                     </div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label for="quantity">Quantity Delivered</label>
@@ -235,19 +441,16 @@
                         </select>
                     </div>
                 </div>
-
                 <button type="submit" class="btn-primary btn-block">Add New Task</button>
             </form>
         </div>
     </div>
 
-    <!-- ===========================
-         NOTIFICATION SETTINGS MODAL
-         =========================== -->
+    <!-- Alert Settings Modal -->
     <div id="notifModal" class="modal">
         <div class="modal-content">
             <span class="close-notif-btn">&times;</span>
-            <h2>🔔 Alert Settings</h2>
+            <h2>Alert Settings</h2>
             <p style="color:var(--text-secondary);margin-bottom:1.5rem;font-size:0.9rem;line-height:1.6;">
                 Get notified when stock hits the minimum level or a batch hasn't been cleared within a week.
             </p>
