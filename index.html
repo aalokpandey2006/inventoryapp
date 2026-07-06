@@ -18,7 +18,11 @@
             document.body.appendChild(errDiv);
         }
         window.addEventListener('error', function(e) {
-            showDiagnosticError(e.message + ' (line ' + e.lineno + ' in ' + e.filename.split("/").pop() + ')');
+            // Ignore cross-origin script errors (e.g. from Firebase CDN) which show as
+            // 'Script error.' with lineno 0 and no filename.
+            if (!e || e.message === 'Script error.' || (!e.filename && e.lineno === 0)) return;
+            const file = e.filename ? e.filename.split('/').pop() : 'inline';
+            showDiagnosticError(e.message + ' (line ' + e.lineno + ' in ' + file + ')');
         });
         window.addEventListener('unhandledrejection', function(e) {
             showDiagnosticError('Promise Rejection: ' + (e.reason ? (e.reason.message || e.reason) : 'Unknown reason'));
@@ -43,7 +47,7 @@
             <div>
                 <div class="sidebar-header">
                     <span class="sidebar-logo">Inventory</span>
-                    <button id="closeSidebarBtn" class="sidebar-close-btn" aria-label="Close menu" style="color: var(--text-muted); background: none; border: none; font-size: 1.2rem; cursor: pointer;">✕</button>
+                    <button id="sidebarCollapseBtn" class="sidebar-collapse-btn" aria-label="Collapse sidebar" title="Collapse sidebar">&#8249;</button>
                 </div>
                 <ul class="sidebar-nav">
                     <li class="nav-item active" data-section="delivery" id="nav-delivery">
@@ -76,8 +80,8 @@
         <div class="container">
             <header>
                 <div class="header-left">
-                    <button id="hamburgerBtn" class="hamburger-btn" aria-label="Open navigation menu" style="display: none; border: 1px solid var(--border-color); background: var(--surface-color); border-radius: 4px; color: var(--text-primary); padding: 0.35rem 0.65rem; cursor: pointer;">
-                        Menu
+                    <button id="hamburgerBtn" class="hamburger-btn" aria-label="Toggle navigation menu">
+                        &#9776;
                     </button>
                     <h1>Inventory <span class="highlight">System</span></h1>
                 </div>
@@ -241,9 +245,10 @@
                 <!-- Grid Navigation & Filters -->
                 <div class="grid-controls-row">
                     <div class="grid-navigation">
-                        <button class="btn-stepper" id="prevMonthBtn">Previous Month (29-30)</button>
-                        <span class="date-range-label" id="dateRangeLabel" style="font-weight: bold; font-size: 1.1rem; color: var(--primary-color);">Current Month</span>
-                        <button class="btn-today" id="currentMonthBtn">Current Month (1-31)</button>
+                        <button class="btn-stepper" id="prevMonthBtn" title="Previous Month">&#8592;</button>
+                        <span class="date-range-label" id="dateRangeLabel" style="font-weight: 700; font-size: 0.95rem; color: var(--primary-color); min-width: 120px; text-align: center;">July 2026</span>
+                        <button class="btn-stepper" id="nextMonthBtn" title="Next Month">&#8594;</button>
+                        <button class="btn-today" id="currentMonthBtn" title="Go to today's month">Today</button>
                     </div>
 
                     <div class="filter-group">
@@ -342,18 +347,11 @@
                 <div class="warehouse-header">
                     <div>
                         <h2 class="warehouse-title">Wages Dashboard</h2>
-                        <p class="warehouse-subtitle">Track and filter calculated wages per person.</p>
+                        <p class="warehouse-subtitle">Track and filter calculated wages per person as per system formulas.</p>
                     </div>
                 </div>
-                
-                <div class="tracker-dashboard">
+                               <div class="tracker-dashboard">
                     <div class="dashboard-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem;">
-                        <div class="filter-group">
-                            <label for="wagesMemberFilter">Member:</label>
-                            <select id="wagesMemberFilter" class="form-input">
-                                <option value="all">All Members</option>
-                            </select>
-                        </div>
                         <div class="filter-group">
                             <label for="wagesPeriodFilter">Period:</label>
                             <select id="wagesPeriodFilter" class="form-input">
@@ -365,26 +363,80 @@
                         </div>
                     </div>
                     
-                    <div class="metric-cards" style="margin-bottom: 1.5rem;">
+                    <div class="metric-cards" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                         <div class="metric-box">
-                            <div class="metric-label">Total Wages For Period</div>
-                            <div class="metric-value" id="wagesTotalDisplay">₹0</div>
+                            <div class="metric-label">Total Wages</div>
+                            <div class="metric-value" id="wagesTotalDisplay" style="color:var(--primary-color);">₹0</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Tasks Completed</div>
+                            <div class="metric-value" id="wagesTasksDisplay" style="color:var(--text-primary);">0</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Hours Logged</div>
+                            <div class="metric-value" id="wagesHoursDisplay" style="color:var(--text-primary);">0h</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Production</div>
+                            <div class="metric-value" id="wagesProductionDisplay" style="color:var(--accent-color);">₹0</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Delivery</div>
+                            <div class="metric-value" id="wagesDeliveryDisplay" style="color:var(--accent-color);">₹0</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Meeting / Other</div>
+                            <div class="metric-value" id="wagesMeetingDisplay" style="color:var(--accent-color);">₹0</div>
                         </div>
                     </div>
 
-                    <div class="table-container">
-                        <table id="wagesTable">
-                            <thead>
-                                <tr>
-                                    <th>Member</th>
-                                    <th>Total Tasks</th>
-                                    <th>Total Wages (₹)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="wagesBody">
-                                <!-- Populated by JS -->
-                            </tbody>
-                        </table>
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+                        <div>
+                            <h3 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1.1rem;">Summary by Member</h3>
+                            <div class="table-container">
+                                <table id="wagesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Member</th>
+                                            <th>Total Tasks</th>
+                                            <th>Total Wages (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="wagesBody">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3 style="color: var(--text-primary); font-size: 1.1rem; margin: 0;">Detailed Wage Log</h3>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <label for="wagesMemberFilter" style="color: var(--text-secondary); font-size: 0.9rem;">Member:</label>
+                                    <select id="wagesMemberFilter" class="form-input" style="padding: 0.3rem 0.5rem; font-size: 0.9rem;">
+                                        <option value="all">All Members</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table id="wagesDetailsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Member</th>
+                                            <th>Category</th>
+                                            <th>Calculation Breakdown</th>
+                                            <th>Calculated Wage</th>
+                                            <th>Payment Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="wagesDetailsBody">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -425,6 +477,7 @@
                         <option value="production" selected>Production</option>
                         <option value="delivery">Delivery</option>
                         <option value="meeting">Meeting a Client</option>
+                        <option value="others">Others</option>
                     </select>
                 </div>
 
@@ -516,11 +569,12 @@
                         <label for="category">Category</label>
                         <select id="category" required style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;">
                             <option value="">Select Category...</option>
-                            <option value="Toilet Cleaner">Toilet Cleaner</option>
-                            <option value="Dishwasher">Dishwasher</option>
-                            <option value="Phenyl">Phenyl</option>
-                            <option value="Glass Cleaner">Glass Cleaner</option>
-                            <option value="Bathroom and Floor Cleaner">Bathroom and Floor Cleaner</option>
+                             <option value="Floor Cleaner">Floor Cleaner</option>
+                             <option value="Bathroom Cleaner">Bathroom Cleaner</option>
+                             <option value="Dishwasher">Dishwasher</option>
+                             <option value="Phenyl">Phenyl</option>
+                             <option value="Glass Cleaner">Glass Cleaner</option>
+                             <option value="Handwash">Handwash</option>
                         </select>
                     </div>
                     <div class="form-group">

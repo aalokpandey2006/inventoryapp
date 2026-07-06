@@ -18,11 +18,12 @@ const db = firebase.firestore();
 // CONSTANTS
 // ===========================
 const WAREHOUSE_CATEGORIES = [
-    { id: 'toilet_cleaner',         name: 'Toilet Cleaner',             icon: '' },
+    { id: 'floor_cleaner',          name: 'Floor Cleaner',              icon: '' },
+    { id: 'bathroom_cleaner',       name: 'Bathroom Cleaner',           icon: '' },
     { id: 'dishwasher',             name: 'Dishwasher',                 icon: '' },
     { id: 'phenyl',                 name: 'Phenyl',                     icon: '' },
     { id: 'glass_cleaner',          name: 'Glass Cleaner',              icon: '' },
-    { id: 'bathroom_floor_cleaner', name: 'Bathroom & Floor Cleaner',   icon: '' },
+    { id: 'handwash',               name: 'Handwash',                   icon: '' },
 ];
 
 const DEFAULT_WAREHOUSE_DOC = {
@@ -101,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const stockStrip = document.getElementById('stockStrip');
                 const navDesign = document.getElementById('nav-design');
                 const navTasks = document.getElementById('nav-tasks');
+                const navWages = document.getElementById('nav-wages');
                 const sidebarCreateTaskBtn = document.getElementById('sidebarCreateTaskBtn');
 
                 if (window.isSuperAdmin || window.isAdmin) {
@@ -113,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (stockStrip) stockStrip.style.display = 'flex';
                     if (navDesign) navDesign.style.display = 'flex';
                     if (navTasks) navTasks.style.display = 'flex';
+                    if (navWages) navWages.style.display = 'flex';
                     
                     // Specific restrictions for regular Admin vs Super Admin
                     const trackerLogHoursBtn = document.getElementById('trackerLogHoursBtn');
@@ -138,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (stockStrip) stockStrip.style.display = 'flex';
                     if (navDesign) navDesign.style.display = 'none';
                     if (navTasks) navTasks.style.display = 'none';
+                    if (navWages) navWages.style.display = 'none';
                     if (sidebarCreateTaskBtn) sidebarCreateTaskBtn.style.display = 'none';
 
                     // Safeguard: Redirect if the current nav tab is restricted
@@ -410,26 +414,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===========================
     // SIDEBAR LOGIC
     // ===========================
-    const hamburgerBtn   = document.getElementById('hamburgerBtn');
-    const sidebar        = document.getElementById('sidebar');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
-    const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+    const hamburgerBtn     = document.getElementById('hamburgerBtn');
+    const sidebar          = document.getElementById('sidebar');
+    const sidebarOverlay   = document.getElementById('sidebarOverlay');
+    const appWrapper       = document.getElementById('app-wrapper');
+    const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
 
-    function openSidebar() {
-        sidebar.classList.add('open');
-        sidebarOverlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
+    function toggleSidebar() {
+        const isCollapsed = appWrapper.classList.toggle('sidebar-collapsed');
+        // Update collapse button chevron direction
+        if (sidebarCollapseBtn) {
+            sidebarCollapseBtn.innerHTML = isCollapsed ? '&#8250;' : '&#8249;';
+            sidebarCollapseBtn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        }
+        // On mobile: also handle overlay
+        if (window.innerWidth < 768) {
+            if (!isCollapsed) {
+                sidebarOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            } else {
+                sidebarOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
     }
 
-    function closeSidebar() {
-        sidebar.classList.remove('open');
+    if (hamburgerBtn) hamburgerBtn.addEventListener('click', toggleSidebar);
+    if (sidebarCollapseBtn) sidebarCollapseBtn.addEventListener('click', toggleSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', () => {
+        appWrapper.classList.add('sidebar-collapsed');
         sidebarOverlay.classList.remove('active');
         document.body.style.overflow = '';
-    }
+    });
 
-    if (hamburgerBtn) hamburgerBtn.addEventListener('click', openSidebar);
-    if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeSidebar);
-    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
     // ===========================
     // SECTION SWITCHING
@@ -443,7 +460,8 @@ document.addEventListener('DOMContentLoaded', () => {
         warehouse: 'Warehouse',
         admin:     'Admin Panel',
         design:    'Design System',
-        tasks:     'Task Tracker'
+        tasks:     'Task Tracker',
+        wages:     'Wages Dashboard'
     };
 
     navItems.forEach(item => {
@@ -854,10 +872,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----- WAREHOUSE GRID RENDERER -----
-    // ----- WAREHOUSE GRID RENDERER -----
     const placeholderImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgcng9IjgiIGZpbGw9IiNlOGVhZWQiLz48cGF0aCBkPSJNMTcwIDEzMCBsMzAgNDAgbDIwLTE1IGw0MCA1NSBIMTQweiIgZmlsbD0iI2JkYzFjNiIvPjxjaXJjbGUgY3g9IjI1MCIgY3k9IjEyMCIgcj0iMTgiIGZpbGw9IiNiZGMxYzYiLz48L3N2Zz4=';
     const categoryMetadata = {
-        'toilet_cleaner': {
+        'floor_cleaner': {
+            img: placeholderImg,
+            sku: 'CHM-F102',
+            subtitle: 'Industrial Grade',
+            tags: ['Chemical', 'Liquid']
+        },
+        'bathroom_cleaner': {
             img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBC7Syp5Bjy482dtMHwmqzfRqlYCErJBrcacBJ7BvkGC4VfA2J1F3spM6TK7qud_mR41QXgiIheqsTSKwypr1uTtgwKbmrLCHqUzmsONCePIVCsa0tZWiirAKrDVP_0n-A0_Cz04gZ4GtpsZTPU6o9OG2nCi7JiLHsaFYtZRREg0VsImaywDylVPojLDQaOIF0h7dK9SEn3F_ZhhBhHURWP5vVzkuZZUThuUZMC1NABMMdWmWCvSAMmKYN_CeydP1PkJujYcyJ8y00K',
             sku: 'CHM-B205',
             subtitle: 'Acidic Compound',
@@ -881,11 +904,11 @@ document.addEventListener('DOMContentLoaded', () => {
             subtitle: 'Ammonia Solution',
             tags: ['Chemical', 'Ammonia']
         },
-        'bathroom_floor_cleaner': {
+        'handwash': {
             img: placeholderImg,
-            sku: 'CHM-F102',
-            subtitle: 'Industrial Grade',
-            tags: ['Chemical', 'Liquid']
+            sku: 'CHM-H550',
+            subtitle: 'Hygiene Grade',
+            tags: ['Chemical', 'Hygiene']
         }
     };
 
@@ -1087,61 +1110,79 @@ document.addEventListener('DOMContentLoaded', () => {
     let trackerTasks = [];
     let selectedDayFilter = 'all';
 
-    // Removed seedDefaultDates logic since dates are now auto-generated by month.
-    let selectedMonthMode = 'current';
-
-    function generateMonthDates(mode) {
-        trackerDates = [];
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        
-        let startDay = 1;
-        let endDay = 31; // fallback
-        
-        if (mode === 'current') {
-            endDay = new Date(year, month + 1, 0).getDate();
-            startDay = 1;
-        } else if (mode === 'previous') {
-            // Previous month: 29 and 30 only
-            startDay = 29;
-            const prevMonthEndDay = new Date(year, month, 0).getDate();
-            endDay = Math.min(30, prevMonthEndDay); 
-            // In February, 30 might not exist. If so, endDay will be 29. Let's just hardcode 29-30 as requested.
-            endDay = 30;
+    // Helper: Safely calculate cost for older tasks missing calculatedCost
+    function getTaskCalculatedCost(task) {
+        let cost = parseFloat(task.calculatedCost);
+        if (isNaN(cost)) {
+            if (task.wageCategory === 'production') cost = task.hours <= 4 ? 100 : 200;
+            else if (task.wageCategory === 'delivery') cost = task.hasVehicle ? 150 : 50;
+            else if (task.wageCategory === 'meeting') cost = parseFloat(task.commissionAmount) || 0;
+            else cost = 0;
         }
+        return cost;
+    }
 
+    // Helper: Convert "MON 29" date string to a logical Unix timestamp for filtering and sorting
+    function getTaskLogicalDate(task) {
+        const match = (task.dateStr || '').match(/\d+/);
+        if (!match) return task.createdAt || 0;
+        const day = parseInt(match[0], 10);
+        const createdDate = new Date(task.createdAt || Date.now());
+        let year = createdDate.getFullYear();
+        let month = createdDate.getMonth();
+        // If task logged early in month (1-7) but date is late (24-31), it belongs to previous month
+        if (createdDate.getDate() <= 7 && day >= 24) {
+            month -= 1;
+            if (month < 0) { month = 11; year -= 1; }
+        }
+        // If task logged late in month (24-31) but date is early (1-7), it belongs to next month
+        else if (createdDate.getDate() >= 24 && day <= 7) {
+            month += 1;
+            if (month > 11) { month = 0; year += 1; }
+        }
+        return new Date(year, month, day).getTime();
+    }
+
+    // Removed seedDefaultDates logic since dates are now auto-generated by month.
+    const _now = new Date();
+    let viewYear = _now.getFullYear();
+    let viewMonth = _now.getMonth(); // 0-indexed
+
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    function generateMonthDates() {
+        trackerDates = [];
         const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-        
-        for (let day = startDay; day <= endDay; day++) {
-            let targetDate;
-            if (mode === 'current') {
-                targetDate = new Date(year, month, day);
-            } else {
-                targetDate = new Date(year, month - 1, day);
-            }
-            
-            // If the date is invalid (like Feb 30), JavaScript handles it by rolling over to March. 
-            // We should ensure it matches the requested month.
-            const targetMonth = mode === 'current' ? month : (month - 1 + 12) % 12;
-            if (targetDate.getMonth() !== targetMonth) continue;
-            
+        const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const targetDate = new Date(viewYear, viewMonth, day);
             const dateStr = `${daysOfWeek[targetDate.getDay()]} ${day}`;
-            
             trackerDates.push({
-                id: `date_${day}`,
+                id: `date_${viewYear}_${viewMonth}_${day}`,
                 dateStr: dateStr,
                 order: day,
                 timestamp: targetDate.getTime()
             });
         }
-        
+
+        // Update the label
+        const label = document.getElementById('dateRangeLabel');
+        if (label) {
+            label.textContent = `${MONTH_NAMES[viewMonth]} ${viewYear}`;
+        }
+
+        // Reset day filter when month changes so no stale day stays selected
+        selectedDayFilter = 'all';
+        const dayFilterEl = document.getElementById('dayFilter');
+        if (dayFilterEl) dayFilterEl.value = 'all';
+
         updateTrackerDropdowns();
         updateDayFilterDropdown();
         renderCalendarGrid();
     }
-    
-    generateMonthDates(selectedMonthMode);
+
+    generateMonthDates();
 
     // Listen to Database
     db.collection('tracker_members').orderBy('createdAt', 'asc').onSnapshot(snap => {
@@ -1150,6 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
             trackerMembers.push({ id: doc.id, ...doc.data() });
         });
         updateTrackerDropdowns();
+        updateMemberFilterDropdown();
         renderCalendarGrid();
     });
 
@@ -1268,6 +1310,35 @@ document.addEventListener('DOMContentLoaded', () => {
         wagesPeriodFilter.addEventListener('change', (e) => {
             selectedWagesDashboardPeriodFilter = e.target.value;
             renderWagesTable();
+        });
+    }
+
+    // Month Navigation Buttons
+    const prevMonthBtn = document.getElementById('prevMonthBtn');
+    if (prevMonthBtn) {
+        prevMonthBtn.addEventListener('click', () => {
+            viewMonth -= 1;
+            if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+            generateMonthDates();
+        });
+    }
+
+    const nextMonthBtn = document.getElementById('nextMonthBtn');
+    if (nextMonthBtn) {
+        nextMonthBtn.addEventListener('click', () => {
+            viewMonth += 1;
+            if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+            generateMonthDates();
+        });
+    }
+
+    const currentMonthBtn = document.getElementById('currentMonthBtn');
+    if (currentMonthBtn) {
+        currentMonthBtn.addEventListener('click', () => {
+            const today = new Date();
+            viewYear = today.getFullYear();
+            viewMonth = today.getMonth();
+            generateMonthDates();
         });
     }
 
@@ -1404,13 +1475,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedWagePeriodFilter !== 'all') {
             const daysToFilter = parseInt(selectedWagePeriodFilter);
             const cutoffTime = Date.now() - (daysToFilter * 24 * 60 * 60 * 1000);
-            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoffTime);
+            filteredTasks = filteredTasks.filter(t => getTaskLogicalDate(t) >= cutoffTime);
         }
 
         filteredTasks.forEach(task => {
             if (totals[task.memberName] !== undefined) {
                 totals[task.memberName] += parseFloat(task.hours) || 0;
-                wageTotals[task.memberName] += parseFloat(task.calculatedCost) || 0;
+                wageTotals[task.memberName] += getTaskCalculatedCost(task);
             }
         });
 
@@ -1420,8 +1491,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let doneCount = 0;
         filteredTasks.forEach(t => {
             sumHours += parseFloat(t.hours) || 0;
-            sumWages += parseFloat(t.calculatedCost) || 0;
-            if (t.status === 'completed') doneCount++;
+            sumWages += getTaskCalculatedCost(t);
+            doneCount++;
         });
 
         const totalHoursVal = document.getElementById('trackerTotalHours');
@@ -1482,8 +1553,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedWagePeriodFilter !== 'all') {
             const daysToFilter = parseInt(selectedWagePeriodFilter);
             const cutoffTime = Date.now() - (daysToFilter * 24 * 60 * 60 * 1000);
-            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoffTime);
+            filteredTasks = filteredTasks.filter(t => getTaskLogicalDate(t) >= cutoffTime);
         }
+
+        // Sort chronologically (newest first for recent logs)
+        filteredTasks.sort((a, b) => getTaskLogicalDate(b) - getTaskLogicalDate(a));
 
         if (filteredTasks.length === 0) {
             body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:1rem;">No task logs saved.</td></tr>';
@@ -1499,71 +1573,153 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${task.memberName}</td>
                 <td><span class="task-status-badge ${task.status}">${task.status.replace('-', ' ')}</span></td>
                 <td style="font-weight:700;color:var(--primary-color);">${task.hours || 0}h</td>
-                <td style="font-weight:700;color:var(--accent-color);">₹${task.calculatedCost || 0}</td>
+                <td style="font-weight:700;color:var(--accent-color);">₹${getTaskCalculatedCost(task)}</td>
             `;
             body.appendChild(tr);
         });
     }
 
+    // Toggle wage payment status (Pending <-> Paid)
+    window.toggleWagePaymentStatus = async (taskId, currentStatus) => {
+        const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
+        try {
+            await db.collection('tracker_tasks').doc(taskId).update({ paymentStatus: newStatus });
+        } catch (e) {
+            showToast('Error', 'Failed to update payment status.', 'danger');
+        }
+    };
+
     // Render Dedicated Wages Table
     function renderWagesTable() {
         const body = document.getElementById('wagesBody');
+        const detailsBody = document.getElementById('wagesDetailsBody');
         const totalDisplay = document.getElementById('wagesTotalDisplay');
+        const prodDisplay = document.getElementById('wagesProductionDisplay');
+        const delDisplay = document.getElementById('wagesDeliveryDisplay');
+        const meetDisplay = document.getElementById('wagesMeetingDisplay');
+        const tasksDisplay = document.getElementById('wagesTasksDisplay');
+        const hoursDisplay = document.getElementById('wagesHoursDisplay');
+
         if (!body) return;
         body.innerHTML = '';
+        if (detailsBody) detailsBody.innerHTML = '';
 
-        let filteredTasks = trackerTasks;
+        // Valid wage categories (includes 'others' - shown with ₹0 wage)
+        const VALID_CATEGORIES = ['production', 'delivery', 'meeting', 'others'];
 
-        if (selectedWagesDashboardMemberFilter !== 'all') {
-            filteredTasks = filteredTasks.filter(t => t.memberName === selectedWagesDashboardMemberFilter);
-        }
+        // 1. Filter to valid categories + period
+        let periodFilteredTasks = trackerTasks.filter(t => VALID_CATEGORIES.includes(t.wageCategory));
 
         const now = new Date();
         if (selectedWagesDashboardPeriodFilter === '7_days') {
             const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
-            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoff);
+            periodFilteredTasks = periodFilteredTasks.filter(t => getTaskLogicalDate(t) >= cutoff);
         } else if (selectedWagesDashboardPeriodFilter === '15_days') {
             const cutoff = Date.now() - (15 * 24 * 60 * 60 * 1000);
-            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoff);
+            periodFilteredTasks = periodFilteredTasks.filter(t => getTaskLogicalDate(t) >= cutoff);
         } else if (selectedWagesDashboardPeriodFilter === 'current_month') {
-            const currentMonthStr = `${now.toLocaleString('default', { month: 'short' }).toUpperCase()}`;
-            // Since we don't have accurate month data on the task yet (dateStr is like "MON 12"), 
-            // for now we will filter based on timestamp for the current month.
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
             const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
-            filteredTasks = filteredTasks.filter(t => {
-                const ts = t.createdAt || t.updatedAt;
+            periodFilteredTasks = periodFilteredTasks.filter(t => {
+                const ts = getTaskLogicalDate(t);
                 return ts >= startOfMonth && ts <= endOfMonth;
             });
         }
 
+        // 2. Accumulate overall summary comparison for ALL members
         const memberWages = {};
         trackerMembers.forEach(m => {
             memberWages[m.name] = { tasks: 0, total: 0 };
         });
 
-        let grandTotal = 0;
-
-        filteredTasks.forEach(task => {
+        periodFilteredTasks.forEach(task => {
+            let cost = getTaskCalculatedCost(task);
             if (memberWages[task.memberName] !== undefined) {
                 memberWages[task.memberName].tasks += 1;
-                const cost = parseFloat(task.calculatedCost) || 0;
                 memberWages[task.memberName].total += cost;
-                grandTotal += cost;
             }
         });
 
-        if (totalDisplay) {
-            totalDisplay.textContent = `₹${grandTotal.toFixed(2)}`;
+        // 3. Filter by Member ONLY for metrics cards and detailed log table
+        let detailFilteredTasks = periodFilteredTasks;
+        if (selectedWagesDashboardMemberFilter !== 'all') {
+            detailFilteredTasks = detailFilteredTasks.filter(t => t.memberName === selectedWagesDashboardMemberFilter);
         }
 
+        let grandTotal = 0;
+        let productionTotal = 0;
+        let deliveryTotal = 0;
+        let meetingTotal = 0;
+        let totalHours = 0;
+        let totalTasksCount = detailFilteredTasks.length;
+
+        // Sort by logical calendar date descending (newest first, so 1st of July is at the bottom)
+        const sortedDetailTasks = [...detailFilteredTasks].sort((a, b) => {
+            return getTaskLogicalDate(b) - getTaskLogicalDate(a);
+        });
+
+        sortedDetailTasks.forEach(task => {
+            let cost = getTaskCalculatedCost(task);
+
+            if (task.wageCategory === 'production') productionTotal += cost;
+            else if (task.wageCategory === 'delivery') deliveryTotal += cost;
+            else if (task.wageCategory === 'meeting') meetingTotal += cost;
+
+            grandTotal += cost;
+            totalHours += parseFloat(task.hours) || 0;
+
+            // Detailed row rendering
+            if (detailsBody) {
+                const tr = document.createElement('tr');
+                let breakdown = '';
+                if (task.wageCategory === 'production') {
+                    breakdown = `${task.hours || 0}h logged (${task.hours <= 4 ? '₹100 flat ≤4h' : '₹200 flat >4h'})`;
+                } else if (task.wageCategory === 'delivery') {
+                    breakdown = `Delivery (${task.hasVehicle ? 'With Vehicle ₹150' : 'No Vehicle ₹50'})`;
+                } else if (task.wageCategory === 'meeting') {
+                    breakdown = `Meeting / Client (Commission ₹${task.commissionAmount || 0})`;
+                } else if (task.wageCategory === 'others') {
+                    breakdown = `Other work — ${task.name || ''}`.trim();
+                }
+
+                const payStatus = task.paymentStatus || 'pending';
+                const isPaid = payStatus === 'paid';
+                const canToggle = window.isSuperAdmin ? `onclick="toggleWagePaymentStatus('${task.id}', '${payStatus}')" style="cursor:pointer;"` : '';
+                const badgeStyle = isPaid
+                    ? `background:rgba(45,212,191,0.15);color:#2dd4bf;border:1px solid rgba(45,212,191,0.4);`
+                    : `background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);`;
+
+                tr.innerHTML = `
+                    <td style="color:var(--text-secondary);font-size:0.85rem;white-space:nowrap;">${task.dateStr}</td>
+                    <td style="font-weight:600;">${task.memberName}</td>
+                    <td><span style="text-transform:capitalize;background:rgba(148,163,184,0.1);padding:2px 8px;border-radius:4px;font-size:0.8rem;">${task.wageCategory}</span></td>
+                    <td style="color:var(--text-secondary);font-size:0.82rem;">${breakdown}</td>
+                    <td style="font-weight:700;color:var(--accent-color);">₹${cost.toFixed(2)}</td>
+                    <td><span ${canToggle} style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;letter-spacing:0.5px;${badgeStyle}">${isPaid ? '✓ Paid' : '⏳ Pending'}</span></td>
+                `;
+                detailsBody.appendChild(tr);
+            }
+        });
+
+        // Update displays
+        if (totalDisplay) totalDisplay.textContent = `₹${grandTotal.toFixed(2)}`;
+        if (prodDisplay) prodDisplay.textContent = `₹${productionTotal.toFixed(2)}`;
+        if (delDisplay) delDisplay.textContent = `₹${deliveryTotal.toFixed(2)}`;
+        if (meetDisplay) meetDisplay.textContent = `₹${meetingTotal.toFixed(2)}`;
+        if (tasksDisplay) tasksDisplay.textContent = totalTasksCount;
+        if (hoursDisplay) hoursDisplay.textContent = `${totalHours.toFixed(1)}h`;
+
+        // Render Summary Comparison table
         const sortedMembers = Object.keys(memberWages).map(name => ({
             name,
             ...memberWages[name]
         })).filter(m => m.total > 0 || m.tasks > 0).sort((a, b) => b.total - a.total);
 
         if (sortedMembers.length === 0) {
-            body.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:1rem;">No wages recorded for this period.</td></tr>';
+            body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:1rem;">No wages recorded for this period.</td></tr>';
+            if (detailsBody && sortedDetailTasks.length === 0) {
+                detailsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:1rem;">No detailed records found.</td></tr>';
+            }
             return;
         }
 
@@ -1576,6 +1732,10 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             body.appendChild(tr);
         });
+
+        if (sortedDetailTasks.length === 0 && detailsBody) {
+            detailsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:1rem;">No detailed records found for this member/period.</td></tr>';
+        }
     }
 
     // Modal Operations// Modals controllers
@@ -1707,6 +1867,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast('Log Entry Saved', 'Task updated successfully.', 'success');
                 } else {
                     submitData.createdAt = Date.now();
+                    submitData.paymentStatus = 'pending'; // New tasks start as Pending
                     await db.collection('tracker_tasks').add(submitData);
                     showToast('Work Hours Logged', 'Logged new hours successfully.', 'success');
                 }
@@ -1739,26 +1900,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Month Navigation Listeners
-    const prevMonthBtn = document.getElementById('prevMonthBtn');
-    const currentMonthBtn = document.getElementById('currentMonthBtn');
-    const dateRangeLabel = document.getElementById('dateRangeLabel');
-
-    if (prevMonthBtn) {
-        prevMonthBtn.addEventListener('click', () => {
-            selectedMonthMode = 'previous';
-            dateRangeLabel.textContent = 'Previous Month';
-            generateMonthDates(selectedMonthMode);
-        });
-    }
-
-    if (currentMonthBtn) {
-        currentMonthBtn.addEventListener('click', () => {
-            selectedMonthMode = 'current';
-            dateRangeLabel.textContent = 'Current Month';
-            generateMonthDates(selectedMonthMode);
-        });
-    }
+    // (Month Navigation Listeners are set up above near other filter listeners)
 
     // Delete team member & clean tasks
     window.deleteMember = async (memberId, memberName) => {
