@@ -8,26 +8,7 @@
     <link rel="stylesheet" href="worksync-theme.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Diagnostic Error Tracker -->
-    <script>
-        function showDiagnosticError(message) {
-            const errDiv = document.getElementById('globalErrorAlert') || document.createElement('div');
-            errDiv.id = 'globalErrorAlert';
-            errDiv.style = 'position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:1rem;z-index:99999;font-family:monospace;font-size:0.9rem;box-shadow:0 4px 10px rgba(0,0,0,0.5);text-align:left;';
-            errDiv.innerHTML = '<strong>JavaScript Error Detected:</strong><br>' + message;
-            document.body.appendChild(errDiv);
-        }
-        window.addEventListener('error', function(e) {
-            // Ignore cross-origin script errors (e.g. from Firebase CDN) which show as
-            // 'Script error.' with lineno 0 and no filename.
-            if (!e || e.message === 'Script error.' || (!e.filename && e.lineno === 0)) return;
-            const file = e.filename ? e.filename.split('/').pop() : 'inline';
-            showDiagnosticError(e.message + ' (line ' + e.lineno + ' in ' + file + ')');
-        });
-        window.addEventListener('unhandledrejection', function(e) {
-            showDiagnosticError('Promise Rejection: ' + (e.reason ? (e.reason.message || e.reason) : 'Unknown reason'));
-        });
-    </script>
+
     
     <!-- Firebase Compat SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>

@@ -441,11 +441,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (hamburgerBtn) hamburgerBtn.addEventListener('click', toggleSidebar);
     if (sidebarCollapseBtn) sidebarCollapseBtn.addEventListener('click', toggleSidebar);
-    if (sidebarOverlay) sidebarOverlay.addEventListener('click', () => {
-        appWrapper.classList.add('sidebar-collapsed');
-        sidebarOverlay.classList.remove('active');
-        document.body.style.overflow = '';
-    });
+    
+    function closeSidebar() {
+        if (window.innerWidth < 768) {
+            appWrapper.classList.add('sidebar-collapsed');
+            if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            if (sidebarCollapseBtn) {
+                sidebarCollapseBtn.innerHTML = '&#8250;';
+                sidebarCollapseBtn.title = 'Expand sidebar';
+            }
+        }
+    }
+
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
 
     // ===========================
@@ -477,7 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (headerSectionLabel) headerSectionLabel.textContent = SECTION_LABELS[target] || '';
 
-            closeSidebar();
+            // User explicitly requested: "the side panel must be open the user must close it"
+            // So we do not automatically close the sidebar on navigation.
         });
     });
 
