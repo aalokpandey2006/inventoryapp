@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const userData = userDoc.data();
                 window.receivesNotifications = userData.receivesNotifications !== false;
                 window.isSuperAdmin = userData.role === 'super_admin';
+                window.isAdmin = userData.role === 'admin';
                 
                 const navLabel = document.getElementById('nav-admin-label');
                 const sectionTitle = document.getElementById('admin-section-title');
@@ -102,17 +103,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 const navTasks = document.getElementById('nav-tasks');
                 const sidebarCreateTaskBtn = document.getElementById('sidebarCreateTaskBtn');
 
-                if (window.isSuperAdmin) {
-                    if (navLabel) navLabel.textContent = 'Admin Panel';
-                    if (sectionTitle) sectionTitle.innerHTML = 'Admin Panel';
-                    if (sectionSubtitle) sectionSubtitle.textContent = 'Manage system users, adjust access roles, and route notifications.';
-                    if (typeof SECTION_LABELS !== 'undefined') SECTION_LABELS.admin = 'Admin Panel';
+                if (window.isSuperAdmin || window.isAdmin) {
+                    if (navLabel) navLabel.textContent = window.isSuperAdmin ? 'Admin Panel' : 'Users';
+                    if (sectionTitle) sectionTitle.innerHTML = window.isSuperAdmin ? 'Admin Panel' : 'User Directory';
+                    if (sectionSubtitle) sectionSubtitle.textContent = window.isSuperAdmin ? 'Manage system users, adjust access roles, and route notifications.' : 'View registered users and their access roles.';
+                    if (typeof SECTION_LABELS !== 'undefined') SECTION_LABELS.admin = window.isSuperAdmin ? 'Admin Panel' : 'Users';
                     
                     if (navWarehouse) navWarehouse.style.display = 'flex';
                     if (stockStrip) stockStrip.style.display = 'flex';
                     if (navDesign) navDesign.style.display = 'flex';
                     if (navTasks) navTasks.style.display = 'flex';
-                    if (sidebarCreateTaskBtn) sidebarCreateTaskBtn.style.display = 'block';
+                    
+                    // Specific restrictions for regular Admin vs Super Admin
+                    const trackerLogHoursBtn = document.getElementById('trackerLogHoursBtn');
+                    const addDateRowBtn = document.getElementById('addDateRowBtn');
+                    const addMemberBtn = document.getElementById('addMemberBtn');
+                    const designEditor = document.getElementById('designEditor');
+                    const saveDesignBtn = document.getElementById('saveDesignBtn');
+                    
+                    if (trackerLogHoursBtn) trackerLogHoursBtn.style.display = window.isSuperAdmin ? 'block' : 'none';
+                    if (addDateRowBtn) addDateRowBtn.style.display = window.isSuperAdmin ? 'inline-block' : 'none';
+                    if (addMemberBtn) addMemberBtn.style.display = window.isSuperAdmin ? 'inline-block' : 'none';
+                    if (designEditor) designEditor.disabled = !window.isSuperAdmin;
+                    if (saveDesignBtn) saveDesignBtn.style.display = window.isSuperAdmin ? 'block' : 'none';
+
                     loadDesignSettings();
                 } else {
                     if (navLabel) navLabel.textContent = 'Users';
@@ -218,11 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (window.isSuperAdmin) {
                     const roleSelectHtml = `
-                        <select class="priority-badge ${user.role === 'super_admin' ? 'priority-high' : 'priority-low'}" 
+                        <select class="priority-badge ${user.role === 'super_admin' ? 'priority-high' : (user.role === 'admin' ? 'priority-medium' : 'priority-low')}" 
                                 onchange="updateUserRole('${uId}', this.value)"
                                 ${isSelf ? 'disabled' : ''}
                                 style="cursor:${isSelf ? 'not-allowed' : 'pointer'};border:1px solid rgba(255,255,255,0.1);outline:none;border-radius:4px;padding:0.25rem 0.5rem;font-family:inherit;">
-                            <option value="user" ${user.role !== 'super_admin' ? 'selected' : ''}>User</option>
+                            <option value="user" ${user.role !== 'super_admin' && user.role !== 'admin' ? 'selected' : ''}>User</option>
+                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
                             <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
                         </select>
                     `;
@@ -244,9 +259,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td data-label="Registered">${dateStr}</td>
                     `;
                 } else {
-                    const roleBadge = user.role === 'super_admin'
-                        ? `<span class="priority-badge priority-high">Super Admin</span>`
-                        : `<span class="priority-badge priority-low">User</span>`;
+                    let roleBadgeStr = `<span class="priority-badge priority-low">User</span>`;
+                    if (user.role === 'super_admin') roleBadgeStr = `<span class="priority-badge priority-high">Super Admin</span>`;
+                    else if (user.role === 'admin') roleBadgeStr = `<span class="priority-badge priority-medium">Admin</span>`;
+                    const roleBadge = roleBadgeStr;
 
                     tr.innerHTML = `
                         <td data-label="Username" style="font-weight:600;color:var(--text-primary);">${user.username} ${isSelf ? ' <span style="font-size:0.75rem;opacity:0.65;font-weight:normal;">(You)</span>' : ''}</td>
@@ -588,11 +604,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (addItemForm) {
+        let keepModalOpen = false;
+        
+        const saveAndAddAnotherBtn = document.getElementById('saveAndAddAnotherBtn');
+        if (saveAndAddAnotherBtn) {
+            saveAndAddAnotherBtn.addEventListener('click', () => {
+                keepModalOpen = true;
+                if (addItemForm.reportValidity()) {
+                    addItemForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                }
+            });
+        }
+
         addItemForm.addEventListener('submit', async e => {
             e.preventDefault();
             const submitBtn = addItemForm.querySelector('button[type="submit"]');
             submitBtn.textContent = 'Adding Task...';
             submitBtn.disabled = true;
+            if (saveAndAddAnotherBtn) saveAndAddAnotherBtn.disabled = true;
 
             const category = document.getElementById('category').value;
             const productName = document.getElementById('productName').value;
@@ -632,8 +661,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
 
-                addModal.style.display = 'none';
+                if (!keepModalOpen) {
+                    addModal.style.display = 'none';
+                }
+                
+                // Reset fields but keep category and some other potentially recurring fields if desired. 
+                // For now, full reset as requested by 'Add Another' pattern, except maybe priority.
+                const lastCategory = document.getElementById('category').value;
+                const lastAssigned = document.getElementById('assignedDelivery').value;
                 addItemForm.reset();
+                if (keepModalOpen) {
+                    document.getElementById('category').value = lastCategory;
+                    document.getElementById('assignedDelivery').value = lastAssigned;
+                }
+                
                 showToast('Task Added', `Added delivery task for ${productName}.`, 'success');
             } catch (err) {
                 console.error(err);
@@ -641,6 +682,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 submitBtn.textContent = 'Add New Task';
                 submitBtn.disabled = false;
+                if (saveAndAddAnotherBtn) saveAndAddAnotherBtn.disabled = false;
+                keepModalOpen = false;
             }
         });
     }
@@ -730,6 +773,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!inventoryBody) return;
         inventoryBody.innerHTML = '';
 
+        // Calculate Dishwasher Qty Out For Delivery
+        const dishwashQtyEl = document.getElementById('dishwashDeliveryQty');
+        if (dishwashQtyEl) {
+            let totalDishwash = 0;
+            inventory.forEach(item => {
+                if (item.category === 'Dishwasher' && item.status !== 'Completed') {
+                    totalDishwash += parseFloat(item.quantity) || 0;
+                }
+            });
+            dishwashQtyEl.textContent = totalDishwash + ' units';
+        }
+
         if (inventory.length === 0) {
             inventoryBody.innerHTML = `
                 <tr>
@@ -799,127 +854,141 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----- WAREHOUSE GRID RENDERER -----
+    // ----- WAREHOUSE GRID RENDERER -----
+    const placeholderImg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgcng9IjgiIGZpbGw9IiNlOGVhZWQiLz48cGF0aCBkPSJNMTcwIDEzMCBsMzAgNDAgbDIwLTE1IGw0MCA1NSBIMTQweiIgZmlsbD0iI2JkYzFjNiIvPjxjaXJjbGUgY3g9IjI1MCIgY3k9IjEyMCIgcj0iMTgiIGZpbGw9IiNiZGMxYzYiLz48L3N2Zz4=';
+    const categoryMetadata = {
+        'toilet_cleaner': {
+            img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBC7Syp5Bjy482dtMHwmqzfRqlYCErJBrcacBJ7BvkGC4VfA2J1F3spM6TK7qud_mR41QXgiIheqsTSKwypr1uTtgwKbmrLCHqUzmsONCePIVCsa0tZWiirAKrDVP_0n-A0_Cz04gZ4GtpsZTPU6o9OG2nCi7JiLHsaFYtZRREg0VsImaywDylVPojLDQaOIF0h7dK9SEn3F_ZhhBhHURWP5vVzkuZZUThuUZMC1NABMMdWmWCvSAMmKYN_CeydP1PkJujYcyJ8y00K',
+            sku: 'CHM-B205',
+            subtitle: 'Acidic Compound',
+            tags: ['Chemical', 'Acidic']
+        },
+        'dishwasher': {
+            img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD0TPom27EWnQkbNv5dzF818TC_1MILillqfrW6strLRBNz3jwSQUcg8S4mmdswrSyqxNKKxG3jrC2Qq6hgZllbpk7ABaNAyNRBAhGgMA6kxDri1SkyNBmdlqFS5na95yDxtP017m5htV_3OkqOajl-LTfHR11kjrarOVjp_HNuxKH36Z3QKHAlEbhvVoB6_I6HzmKaXOgbjv9TniVTgDp_bJYgXd__UBxPyHdsP0FOww-WhSaTEIJY_0GcwSYEMkfMrtHg73_nsT3b',
+            sku: 'CHM-D301',
+            subtitle: 'Standard Base',
+            tags: ['Chemical', 'Base']
+        },
+        'phenyl': {
+            img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCUxbPevEWvsDnC2-tNBLaVRQ0M50p1Qi4dtZUZyGwmQXZ4ALFVDK5VtNf67kakb4nhp27PqMIg6EOWJyV-4O0oMJLQB7tdYitSS7_lGXFoN4PPYb6rEtG6jXrHvD601lXiwRKi-XSVA1VJpIlx87yqEEFtXfojhC_9J32Xm5M2mrp5KkyYYRDb-0Io9RhgVXTGMpHwIoAlT-8YV6u-JaGfJsLIPk1QwtNX2_RLJXeKRmPtdevEMGBwRD4CTMPQKS950NQ7QQwta2cY',
+            sku: 'CHM-P5590',
+            subtitle: 'Concentrated Disinfectant',
+            tags: ['Chemical', 'Disinfectant']
+        },
+        'glass_cleaner': {
+            img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCu-rrcZs-q5UOWYs-x5jJVSjob4f7v6cZ9pqE-D6n1DSFyNtqUw9hwGoTZofqm2OBfttJBTRJmOY0lQxintLqVI9hJr7OfOiWz76upkct0iHKpQDupT4ammugE8OgsGoNjovvqGJu7M8oWdS1hwzjEJUsuplwfOmv0qgwD2Q0dCHZYSurFUUqW5iSgGK1qvFKOD8CxXOi6lnw9dsFEp0nGflOGT12K4oDgp9r6mQiHf9G4BdmiWwPsu0KCWpJVApyjVgRczu5mtieu',
+            sku: 'CHM-G442',
+            subtitle: 'Ammonia Solution',
+            tags: ['Chemical', 'Ammonia']
+        },
+        'bathroom_floor_cleaner': {
+            img: placeholderImg,
+            sku: 'CHM-F102',
+            subtitle: 'Industrial Grade',
+            tags: ['Chemical', 'Liquid']
+        }
+    };
+
     function renderWarehouseGrid() {
         const grid = document.getElementById('warehouseGrid');
         if (!grid) return;
         grid.innerHTML = '';
+        
+        // Remove old CSS grid logic to rely entirely on flex/grid from CSS classes we injected
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+        grid.style.gap = '1.5rem';
 
         WAREHOUSE_CATEGORIES.forEach(cat => {
             const data = warehouseData[cat.id] || { ...DEFAULT_WAREHOUSE_DOC };
-            const stock = data.stockRemaining;
-            const minStock = data.minimumStock;
+            const stock = data.stockRemaining || 0;
+            const minStock = data.minimumStock || 0;
             const isLow = stock <= minStock;
-            const outDel = data.outForDelivery;
-            const rawOrd = data.rawMaterialsOrdered;
-            const rawInv = data.rawMaterialsInInventory;
-            const prodRate = data.productionRatePerDay;
+            const outDel = data.outForDelivery || 0;
+            const rawOrd = data.rawMaterialsOrdered || 0;
+            const rawInv = data.rawMaterialsInInventory || 0;
+            const prodRate = data.productionRatePerDay || 0;
             const lastDate = data.lastBatchDate;
 
-            let clearanceDateDisplay = 'N/A';
-            if (prodRate > 0 && stock > 0) {
-                const daysNeeded = Math.ceil(stock / prodRate);
-                const d = new Date();
-                d.setDate(d.getDate() + daysNeeded);
-                clearanceDateDisplay = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+            let batchDateDisplay = 'N/A';
+            if (lastDate) {
+                batchDateDisplay = (lastDate.toDate ? lastDate.toDate() : new Date(lastDate)).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
             }
 
-            const batchDateInput = lastDate
-                ? (lastDate.toDate ? lastDate.toDate().toISOString().split('T')[0] : new Date(lastDate).toISOString().split('T')[0])
-                : '';
-
-            const maxRef = Math.max(stock, 100);
-            const pct = Math.min(Math.round((stock / maxRef) * 100), 100);
+            const meta = categoryMetadata[cat.id] || { img: '', sku: 'UNKNOWN', subtitle: '', tags: [] };
+            const tagsHtml = meta.tags.map(t => `<span class="wh-tag">${t}</span>`).join('');
 
             const card = document.createElement('div');
-            card.className = `warehouse-card ${isLow ? 'low-stock' : ''}`;
+            card.className = `wh-product-card group`;
             card.innerHTML = `
-                <div class="wcard-header">
-                    <div class="wcard-title-wrap">
-                        <h3>${cat.name}</h3>
-                    </div>
-                    <span class="wcard-badge ${isLow ? 'low' : 'good'}">${isLow ? 'REFILL NEEDED' : 'STOCK STABLE'}</span>
+                <div class="wh-product-img-box">
+                    <img src="${meta.img}" alt="${cat.name}" class="wh-product-img">
                 </div>
-                <div class="wcard-body">
-                    <div class="wcard-section-label">Raw Materials</div>
-                    ${buildEditableRow(cat.id, 'rawMaterialsOrdered',     'Ordered',                rawOrd,     'number', 'units')}
-                    ${buildEditableRow(cat.id, 'rawMaterialsInInventory', 'In Inventory',           rawInv,     'number', 'units')}
-                    ${buildEditableRow(cat.id, 'productionRatePerDay',    'Converted / Day',        prodRate,   'number', 'units/day')}
-                    <div class="wcard-row">
-                        <span class="wcard-label">Est. Clearance Date</span>
-                        <span class="wcard-value auto-calc" style="font-size:0.8rem;">${clearanceDateDisplay}</span>
+                
+                <div class="wh-product-details">
+                    <div>
+                        <div class="wh-sku-wrap">
+                            <span class="wh-sku-dot ${isLow ? 'low' : 'good'}"></span>
+                        </div>
+                        <h3 class="wh-product-title">${cat.name}</h3>
+                        <p class="wh-product-subtitle">${meta.subtitle} &bull; Batch: <span style="color:var(--text-primary);cursor:pointer;" onclick="startEditFieldNew('${cat.id}', 'lastBatchDate', 'date')" id="val-${cat.id}-lastBatchDate">${batchDateDisplay}</span></p>
+                        <div id="wrap-${cat.id}-lastBatchDate" style="display:none;"></div> <!-- Placeholder for date edit -->
                     </div>
-                    <hr class="wcard-divider">
-                    <div class="wcard-section-label">Stock</div>
-                    ${buildEditableRow(cat.id, 'stockRemaining', 'Stock Remaining',      stock,    'number', 'units')}
-                    ${buildEditableRow(cat.id, 'minimumStock',   'Min. Stock Threshold', minStock, 'number', 'units')}
-                    <hr class="wcard-divider">
-                    <div class="wcard-section-label">Delivery</div>
-                    <div class="wcard-row">
-                        <span class="wcard-label">Out for Delivery</span>
-                        <span class="wcard-value">${outDel} units</span>
-                    </div>
-                    ${buildEditableRow(cat.id, 'lastBatchDate',  'Batch Made On',
-                        batchDateInput ? { toDate: () => new Date(batchDateInput) } : null, 'date', '')}
+                    <div class="wh-product-tags">${tagsHtml}</div>
                 </div>
-                <div class="wcard-stock-bar-wrap">
-                    <div class="stock-bar-label">
-                        <span>Stock Level</span>
-                        <span>${stock} / ~${maxRef} units (${pct}%)</span>
-                    </div>
-                    <div class="stock-bar-track">
-                        <div class="stock-bar-fill" style="width:${pct}%;background-color:${isLow ? 'var(--danger-color)' : 'var(--accent-color)'};"></div>
-                    </div>
+
+                <div class="wh-metrics-grid">
+                    ${buildMetricBox(cat.id, 'stockRemaining', 'Available', stock)}
+                    ${buildMetricBox(cat.id, 'minimumStock', 'Threshold', minStock)}
+                    ${buildMetricBox(cat.id, 'rawMaterialsInInventory', 'Raw Stock', rawInv)}
+                    ${buildMetricBox(cat.id, 'rawMaterialsOrdered', 'Ordered', rawOrd)}
+                    ${buildMetricBox(cat.id, 'productionRatePerDay', 'Daily Prod', prodRate)}
+                    ${buildMetricBox(cat.id, 'outForDelivery', 'Delivered', outDel)}
                 </div>
             `;
             grid.appendChild(card);
         });
     }
 
-    function buildEditableRow(catId, field, label, val, type, suffix) {
-        let displayVal = val;
-        if (val && val.toDate) {
-            displayVal = val.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-        } else if (!val && type === 'date') {
-            displayVal = 'N/A';
-        } else if (!val && type === 'number') {
-            displayVal = '0';
-        }
-
+    function buildMetricBox(catId, field, label, val) {
         return `
-            <div class="wcard-row">
-                <span class="wcard-label">${label}</span>
-                <div class="wcard-value-wrap">
-                    <span class="wcard-value" id="val-${catId}-${field}">${displayVal} ${suffix}</span>
-                    <button class="btn-edit-field" onclick="startEditField('${catId}', '${field}', '${type}', '${suffix}')">edit</button>
-                </div>
+            <div class="wh-metric-box" id="wrap-${catId}-${field}" onclick="startEditFieldNew('${catId}', '${field}', 'number')">
+                <p class="wh-metric-label">${label}</p>
+                <p class="wh-metric-value" id="val-${catId}-${field}">${val}</p>
             </div>
         `;
     }
 
-    window.startEditField = (catId, field, type, suffix) => {
-        const wrap = document.querySelector(`#val-${catId}-${field}`).parentNode;
-        const currentText = document.querySelector(`#val-${catId}-${field}`).textContent.replace(suffix, '').trim();
+    window.startEditFieldNew = (catId, field, type) => {
+        const wrap = document.getElementById(`wrap-${catId}-${field}`);
+        if (!wrap) return;
         
+        // Prevent double clicking
+        if (wrap.querySelector('input')) return;
+
+        const valSpan = document.getElementById(`val-${catId}-${field}`);
+        const currentText = valSpan.textContent.trim();
+
         let inputHtml = '';
         if (type === 'date') {
-            let defaultDate = '';
-            if (currentText !== 'N/A') {
-                const dateObj = new Date(currentText);
-                if (!isNaN(dateObj)) defaultDate = dateObj.toISOString().split('T')[0];
-            }
-            inputHtml = `<input type="date" id="input-${catId}-${field}" value="${defaultDate}" class="field-input" style="color-scheme:dark;">`;
+            // For date, we hide the text and show input inside the placeholder
+            wrap.style.display = 'flex';
+            wrap.style.marginTop = '4px';
+            inputHtml = `<input type="date" id="input-${catId}-${field}" class="field-input" style="color-scheme:dark; width: 110px;">`;
         } else {
-            inputHtml = `<input type="number" id="input-${catId}-${field}" value="${parseFloat(currentText) || 0}" class="field-input" step="any">`;
+            inputHtml = `<input type="number" id="input-${catId}-${field}" value="${currentText}" class="field-input" step="any" onclick="event.stopPropagation()">`;
         }
 
         wrap.innerHTML = `
             ${inputHtml}
-            <button class="btn-save-field" onclick="saveEditField('${catId}', '${field}', '${type}', '${suffix}')">save</button>
+            <button class="btn-save-field" onclick="event.stopPropagation(); saveEditFieldNew('${catId}', '${field}', '${type}')">SAVE</button>
         `;
     };
 
-    window.saveEditField = async (catId, field, type, suffix) => {
+    window.saveEditFieldNew = async (catId, field, type) => {
         const input = document.getElementById(`input-${catId}-${field}`);
+        if (!input) return;
+        
         let newVal = input.value;
 
         if (type === 'number') {
@@ -1018,57 +1087,61 @@ document.addEventListener('DOMContentLoaded', () => {
     let trackerTasks = [];
     let selectedDayFilter = 'all';
 
-    // Seeding logic for dates
-    async function seedDefaultDates() {
-        try {
-            const snap = await db.collection('tracker_dates').get();
-            
-            // Check if we need to reseed (either empty, or containing old un-timestamped data)
-            let needsReseed = snap.empty;
-            if (!snap.empty) {
-                const firstDoc = snap.docs[0].data();
-                if (!firstDoc.timestamp) {
-                    needsReseed = true;
-                    // Delete old dates to avoid duplicates or mixing
-                    const deleteBatch = db.batch();
-                    snap.docs.forEach(doc => deleteBatch.delete(doc.ref));
-                    await deleteBatch.commit();
-                }
-            }
-            
-            if (needsReseed) {
-                const batch = db.batch();
-                
-                // Calculate Monday of the current week (today's week)
-                const today = new Date();
-                const day = today.getDay(); // 0 is Sunday, 1 is Monday...
-                const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-                const monday = new Date(today.setDate(diff));
-                monday.setHours(12, 0, 0, 0); // avoid timezone shifts
-                
-                const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-                
-                for (let i = 0; i < 5; i++) {
-                    const currentDate = new Date(monday.getTime() + i * 86400000);
-                    const dayName = daysOfWeek[currentDate.getDay()];
-                    const dayNum = currentDate.getDate();
-                    const dateStr = `${dayName} ${dayNum}`;
-                    
-                    const ref = db.collection('tracker_dates').doc();
-                    batch.set(ref, {
-                        dateStr: dateStr,
-                        order: i + 1,
-                        timestamp: currentDate.getTime()
-                    });
-                }
-                await batch.commit();
-            }
-        } catch (e) {
-            console.error("Error seeding dates", e);
+    // Removed seedDefaultDates logic since dates are now auto-generated by month.
+    let selectedMonthMode = 'current';
+
+    function generateMonthDates(mode) {
+        trackerDates = [];
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        
+        let startDay = 1;
+        let endDay = 31; // fallback
+        
+        if (mode === 'current') {
+            endDay = new Date(year, month + 1, 0).getDate();
+            startDay = 1;
+        } else if (mode === 'previous') {
+            // Previous month: 29 and 30 only
+            startDay = 29;
+            const prevMonthEndDay = new Date(year, month, 0).getDate();
+            endDay = Math.min(30, prevMonthEndDay); 
+            // In February, 30 might not exist. If so, endDay will be 29. Let's just hardcode 29-30 as requested.
+            endDay = 30;
         }
+
+        const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+        
+        for (let day = startDay; day <= endDay; day++) {
+            let targetDate;
+            if (mode === 'current') {
+                targetDate = new Date(year, month, day);
+            } else {
+                targetDate = new Date(year, month - 1, day);
+            }
+            
+            // If the date is invalid (like Feb 30), JavaScript handles it by rolling over to March. 
+            // We should ensure it matches the requested month.
+            const targetMonth = mode === 'current' ? month : (month - 1 + 12) % 12;
+            if (targetDate.getMonth() !== targetMonth) continue;
+            
+            const dateStr = `${daysOfWeek[targetDate.getDay()]} ${day}`;
+            
+            trackerDates.push({
+                id: `date_${day}`,
+                dateStr: dateStr,
+                order: day,
+                timestamp: targetDate.getTime()
+            });
+        }
+        
+        updateTrackerDropdowns();
+        updateDayFilterDropdown();
+        renderCalendarGrid();
     }
     
-    seedDefaultDates();
+    generateMonthDates(selectedMonthMode);
 
     // Listen to Database
     db.collection('tracker_members').orderBy('createdAt', 'asc').onSnapshot(snap => {
@@ -1080,15 +1153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCalendarGrid();
     });
 
-    db.collection('tracker_dates').orderBy('order', 'asc').onSnapshot(snap => {
-        trackerDates = [];
-        snap.forEach(doc => {
-            trackerDates.push({ id: doc.id, ...doc.data() });
-        });
-        updateTrackerDropdowns();
-        updateDayFilterDropdown();
-        renderCalendarGrid();
-    });
+    // No tracker_dates listener; dates are generated in memory based on month selection
 
     db.collection('tracker_tasks').orderBy('createdAt', 'desc').onSnapshot(snap => {
         trackerTasks = [];
@@ -1098,6 +1163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCalendarGrid();
         renderComparisonChart();
         renderRecentLogs();
+        renderWagesTable();
     });
 
     // Populate dropdown fields
@@ -1130,15 +1196,78 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         filter.value = currentValue;
+        updateMemberFilterDropdown();
     }
 
-    // Filter Trigger
+    // Filter Triggers
+    let selectedMemberFilter = 'all';
+    let selectedWagePeriodFilter = 'all';
+    let selectedWagesDashboardMemberFilter = 'all';
+    let selectedWagesDashboardPeriodFilter = 'current_month';
+
+    function updateMemberFilterDropdown() {
+        const filter = document.getElementById('memberFilter');
+        const wagesMemberFilter = document.getElementById('wagesMemberFilter');
+        
+        let optionsHtml = '<option value="all">All Members</option>';
+        trackerMembers.forEach(m => {
+            optionsHtml += `<option value="${m.name}">${m.name}</option>`;
+        });
+
+        if (filter) {
+            const currentValue = filter.value;
+            filter.innerHTML = optionsHtml;
+            filter.value = currentValue || 'all';
+        }
+
+        if (wagesMemberFilter) {
+            const currentValue = wagesMemberFilter.value;
+            wagesMemberFilter.innerHTML = optionsHtml;
+            wagesMemberFilter.value = currentValue || 'all';
+        }
+    }
+
     const dayFilter = document.getElementById('dayFilter');
     if (dayFilter) {
         dayFilter.addEventListener('change', (e) => {
             selectedDayFilter = e.target.value;
             renderCalendarGrid();
             renderComparisonChart();
+            renderRecentLogs();
+        });
+    }
+
+    const memberFilter = document.getElementById('memberFilter');
+    if (memberFilter) {
+        memberFilter.addEventListener('change', (e) => {
+            selectedMemberFilter = e.target.value;
+            renderComparisonChart();
+            renderRecentLogs();
+        });
+    }
+
+    const wagePeriodFilter = document.getElementById('wagePeriodFilter');
+    if (wagePeriodFilter) {
+        wagePeriodFilter.addEventListener('change', (e) => {
+            selectedWagePeriodFilter = e.target.value;
+            renderComparisonChart();
+            renderRecentLogs();
+        });
+    }
+
+    const wagesMemberFilter = document.getElementById('wagesMemberFilter');
+    if (wagesMemberFilter) {
+        wagesMemberFilter.addEventListener('change', (e) => {
+            selectedWagesDashboardMemberFilter = e.target.value;
+            renderWagesTable();
+        });
+    }
+
+    const wagesPeriodFilter = document.getElementById('wagesPeriodFilter');
+    if (wagesPeriodFilter) {
+        wagesPeriodFilter.addEventListener('change', (e) => {
+            selectedWagesDashboardPeriodFilter = e.target.value;
+            renderWagesTable();
         });
     }
 
@@ -1154,9 +1283,9 @@ document.addEventListener('DOMContentLoaded', () => {
             headerRow.innerHTML += `
                 <th>
                     <div class="member-header-card">
-                        <button class="btn-delete-member" onclick="deleteMember('${m.id}', '${m.name}')">✕</button>
-                        <input type="text" value="${m.name}" onchange="updateMemberName('${m.id}', this.value)">
-                        <input type="text" class="member-role-input" value="${m.role}" onchange="updateMemberRole('${m.id}', this.value)">
+                        ${window.isSuperAdmin ? `<button class="btn-delete-member" onclick="deleteMember('${m.id}', '${m.name}')">✕</button>` : ''}
+                        <input type="text" value="${m.name}" onchange="updateMemberName('${m.id}', this.value)" ${!window.isSuperAdmin ? 'disabled' : ''} style="${!window.isSuperAdmin ? 'background:transparent;border:none;' : ''}">
+                        <input type="text" class="member-role-input" value="${m.role}" onchange="updateMemberRole('${m.id}', this.value)" ${!window.isSuperAdmin ? 'disabled' : ''} style="${!window.isSuperAdmin ? 'background:transparent;border:none;' : ''}">
                     </div>
                 </th>
             `;
@@ -1189,11 +1318,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const td = document.createElement('td');
                 const matchingTasks = trackerTasks.filter(t => t.memberName === member.name && t.dateStr === date.dateStr);
 
-                let cellContentHtml = '';
+                let cellContentHtml = '<div style="display: flex; flex-direction: column; gap: 4px; height: 100%; min-height: 40px;">';
                 if (matchingTasks.length > 0) {
                     matchingTasks.forEach(task => {
                         cellContentHtml += `
-                            <div class="task-card-item" onclick="startEditTask('${task.id}')">
+                            <div class="task-card-item" ${window.isSuperAdmin ? `onclick="startEditTask('${task.id}')"` : 'style="cursor:default;"'}>
                                 <div class="task-card-title">${task.name}</div>
                                 <div class="task-card-meta">
                                     <span>${task.hours}h</span>
@@ -1202,14 +1331,24 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         `;
                     });
-                } else {
-                    // Empty container
-                    cellContentHtml = `
-                        <div class="task-cell-inner" onclick="openAddTaskPopup('${member.name}', '${date.dateStr}')">
+                }
+                
+                if (window.isSuperAdmin) {
+                    // Always show add button so multiple tasks can be added
+                    cellContentHtml += `
+                        <div class="task-cell-inner" onclick="openAddTaskPopup('${member.name}', '${date.dateStr}')" style="cursor:pointer; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 24px; border-radius: 4px; transition: background 0.2s; margin-top: auto;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                             <span style="opacity: 0.15; font-size: 1.2rem;">+</span>
                         </div>
                     `;
+                } else if (matchingTasks.length === 0) {
+                    // Empty placeholder for non-admins
+                    cellContentHtml += `
+                        <div class="task-cell-inner" style="cursor:default; flex: 1;">
+                            <span style="opacity: 0;">+</span>
+                        </div>
+                    `;
                 }
+                cellContentHtml += '</div>';
 
                 td.innerHTML = cellContentHtml;
                 tr.appendChild(td);
@@ -1246,34 +1385,53 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!list) return;
         list.innerHTML = '';
 
-        // Calculate hours
+        // Calculate hours and wages
         const totals = {};
-        trackerMembers.forEach(m => { totals[m.name] = 0; });
+        const wageTotals = {};
+        trackerMembers.forEach(m => { 
+            totals[m.name] = 0; 
+            wageTotals[m.name] = 0;
+        });
 
-        const filteredTasks = selectedDayFilter === 'all'
-            ? trackerTasks
-            : trackerTasks.filter(t => t.dateStr === selectedDayFilter);
+        let filteredTasks = trackerTasks;
+
+        if (selectedDayFilter !== 'all') {
+            filteredTasks = filteredTasks.filter(t => t.dateStr === selectedDayFilter);
+        }
+        if (selectedMemberFilter !== 'all') {
+            filteredTasks = filteredTasks.filter(t => t.memberName === selectedMemberFilter);
+        }
+        if (selectedWagePeriodFilter !== 'all') {
+            const daysToFilter = parseInt(selectedWagePeriodFilter);
+            const cutoffTime = Date.now() - (daysToFilter * 24 * 60 * 60 * 1000);
+            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoffTime);
+        }
 
         filteredTasks.forEach(task => {
             if (totals[task.memberName] !== undefined) {
                 totals[task.memberName] += parseFloat(task.hours) || 0;
+                wageTotals[task.memberName] += parseFloat(task.calculatedCost) || 0;
             }
         });
 
         // Compute metrics
         let sumHours = 0;
+        let sumWages = 0;
         let doneCount = 0;
         filteredTasks.forEach(t => {
             sumHours += parseFloat(t.hours) || 0;
+            sumWages += parseFloat(t.calculatedCost) || 0;
             if (t.status === 'completed') doneCount++;
         });
 
         const totalHoursVal = document.getElementById('trackerTotalHours');
+        const totalWagesVal = document.getElementById('trackerTotalWages');
         const tasksDoneVal = document.getElementById('trackerTasksDone');
         const headerTotalHours = document.getElementById('headerTotalHours');
         const headerTasksDone = document.getElementById('headerTasksDone');
 
         if (totalHoursVal) totalHoursVal.textContent = sumHours.toFixed(1);
+        if (totalWagesVal) totalWagesVal.textContent = sumWages;
         if (tasksDoneVal) tasksDoneVal.textContent = doneCount;
         if (headerTotalHours) headerTotalHours.textContent = sumHours.toFixed(1);
         if (headerTasksDone) headerTasksDone.textContent = doneCount;
@@ -1281,7 +1439,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Sort members
         const sorted = Object.keys(totals).map(name => ({
             name,
-            hours: totals[name]
+            hours: totals[name],
+            wages: wageTotals[name]
         })).sort((a, b) => b.hours - a.hours);
 
         const maxHours = Math.max(...sorted.map(s => s.hours), 1);
@@ -1312,26 +1471,114 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!body) return;
         body.innerHTML = '';
 
-        if (trackerTasks.length === 0) {
-            body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:1rem;">No task logs saved.</td></tr>';
+        let filteredTasks = trackerTasks;
+
+        if (selectedDayFilter !== 'all') {
+            filteredTasks = filteredTasks.filter(t => t.dateStr === selectedDayFilter);
+        }
+        if (selectedMemberFilter !== 'all') {
+            filteredTasks = filteredTasks.filter(t => t.memberName === selectedMemberFilter);
+        }
+        if (selectedWagePeriodFilter !== 'all') {
+            const daysToFilter = parseInt(selectedWagePeriodFilter);
+            const cutoffTime = Date.now() - (daysToFilter * 24 * 60 * 60 * 1000);
+            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoffTime);
+        }
+
+        if (filteredTasks.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:1rem;">No task logs saved.</td></tr>';
             return;
         }
 
         // Limit to 5 logs
-        trackerTasks.slice(0, 5).forEach(task => {
+        filteredTasks.slice(0, 5).forEach(task => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${task.dateStr}</td>
                 <td style="font-weight:600;">${task.name}</td>
                 <td>${task.memberName}</td>
                 <td><span class="task-status-badge ${task.status}">${task.status.replace('-', ' ')}</span></td>
-                <td style="font-weight:700;color:var(--primary-color);">${task.hours}h</td>
+                <td style="font-weight:700;color:var(--primary-color);">${task.hours || 0}h</td>
+                <td style="font-weight:700;color:var(--accent-color);">₹${task.calculatedCost || 0}</td>
             `;
             body.appendChild(tr);
         });
     }
 
-    // Modals controllers
+    // Render Dedicated Wages Table
+    function renderWagesTable() {
+        const body = document.getElementById('wagesBody');
+        const totalDisplay = document.getElementById('wagesTotalDisplay');
+        if (!body) return;
+        body.innerHTML = '';
+
+        let filteredTasks = trackerTasks;
+
+        if (selectedWagesDashboardMemberFilter !== 'all') {
+            filteredTasks = filteredTasks.filter(t => t.memberName === selectedWagesDashboardMemberFilter);
+        }
+
+        const now = new Date();
+        if (selectedWagesDashboardPeriodFilter === '7_days') {
+            const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
+            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoff);
+        } else if (selectedWagesDashboardPeriodFilter === '15_days') {
+            const cutoff = Date.now() - (15 * 24 * 60 * 60 * 1000);
+            filteredTasks = filteredTasks.filter(t => (t.createdAt || t.updatedAt) >= cutoff);
+        } else if (selectedWagesDashboardPeriodFilter === 'current_month') {
+            const currentMonthStr = `${now.toLocaleString('default', { month: 'short' }).toUpperCase()}`;
+            // Since we don't have accurate month data on the task yet (dateStr is like "MON 12"), 
+            // for now we will filter based on timestamp for the current month.
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+            filteredTasks = filteredTasks.filter(t => {
+                const ts = t.createdAt || t.updatedAt;
+                return ts >= startOfMonth && ts <= endOfMonth;
+            });
+        }
+
+        const memberWages = {};
+        trackerMembers.forEach(m => {
+            memberWages[m.name] = { tasks: 0, total: 0 };
+        });
+
+        let grandTotal = 0;
+
+        filteredTasks.forEach(task => {
+            if (memberWages[task.memberName] !== undefined) {
+                memberWages[task.memberName].tasks += 1;
+                const cost = parseFloat(task.calculatedCost) || 0;
+                memberWages[task.memberName].total += cost;
+                grandTotal += cost;
+            }
+        });
+
+        if (totalDisplay) {
+            totalDisplay.textContent = `₹${grandTotal.toFixed(2)}`;
+        }
+
+        const sortedMembers = Object.keys(memberWages).map(name => ({
+            name,
+            ...memberWages[name]
+        })).filter(m => m.total > 0 || m.tasks > 0).sort((a, b) => b.total - a.total);
+
+        if (sortedMembers.length === 0) {
+            body.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:1rem;">No wages recorded for this period.</td></tr>';
+            return;
+        }
+
+        sortedMembers.forEach(member => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight:600;">${member.name}</td>
+                <td>${member.tasks} tasks</td>
+                <td style="font-weight:700;color:var(--accent-color);">₹${member.total.toFixed(2)}</td>
+            `;
+            body.appendChild(tr);
+        });
+    }
+
+    // Modal Operations// Modals controllers
     const trackerAddModal = document.getElementById('trackerAddModal');
     const trackerMemberModal = document.getElementById('trackerMemberModal');
     
@@ -1375,6 +1622,16 @@ document.addEventListener('DOMContentLoaded', () => {
         trackerAddModal.style.display = 'flex';
     };
 
+    window.toggleWageFields = function() {
+        const cat = document.getElementById('wageCategory').value;
+        const pFields = document.getElementById('productionFields');
+        const dFields = document.getElementById('deliveryFields');
+        const mFields = document.getElementById('meetingFields');
+        if (pFields) pFields.style.display = (cat === 'production') ? 'block' : 'none';
+        if (dFields) dFields.style.display = (cat === 'delivery') ? 'block' : 'none';
+        if (mFields) mFields.style.display = (cat === 'meeting') ? 'block' : 'none';
+    };
+
     window.startEditTask = (taskId) => {
         const task = trackerTasks.find(t => t.id === taskId);
         if (!task) return;
@@ -1384,7 +1641,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('taskMemberSelect').value = task.memberName;
         document.getElementById('taskDateSelect').value = task.dateStr;
         document.getElementById('taskName').value = task.name;
+        
+        document.getElementById('wageCategory').value = task.wageCategory || 'production';
+        if (typeof toggleWageFields === 'function') toggleWageFields();
+        
         document.getElementById('taskHours').value = task.hours;
+        document.getElementById('hasVehicle').checked = task.hasVehicle || false;
+        document.getElementById('commissionAmount').value = task.commissionAmount || '';
         document.getElementById('taskStatus').value = task.status;
         
         const delBtn = document.getElementById('deleteTaskBtn');
@@ -1417,11 +1680,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const memberName = document.getElementById('taskMemberSelect').value;
             const dateStr = document.getElementById('taskDateSelect').value;
             const name = document.getElementById('taskName').value;
+            const wageCategory = document.getElementById('wageCategory').value;
             const hours = parseFloat(document.getElementById('taskHours').value) || 0;
+            const hasVehicle = document.getElementById('hasVehicle').checked;
+            const commissionAmount = parseFloat(document.getElementById('commissionAmount').value) || 0;
             const status = document.getElementById('taskStatus').value;
+            
+            let calculatedCost = 0;
+            if (wageCategory === 'production') {
+                calculatedCost = hours <= 4 ? 100 : 200;
+            } else if (wageCategory === 'delivery') {
+                calculatedCost = hasVehicle ? 150 : 50;
+            } else if (wageCategory === 'meeting') {
+                calculatedCost = commissionAmount;
+            }
 
             const submitData = {
-                memberName, dateStr, name, hours, status,
+                memberName, dateStr, name, status,
+                wageCategory, hours, hasVehicle, commissionAmount, calculatedCost,
                 updatedAt: Date.now()
             };
 
@@ -1463,54 +1739,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Extend row date trigger (+ Add Date Row)
-    const addDateRowBtn = document.getElementById('addDateRowBtn');
-    if (addDateRowBtn) {
-        addDateRowBtn.addEventListener('click', async () => {
-            let nextDateStr = '';
-            let nextOrder = 1;
-            let nextTimestamp = Date.now();
+    // Month Navigation Listeners
+    const prevMonthBtn = document.getElementById('prevMonthBtn');
+    const currentMonthBtn = document.getElementById('currentMonthBtn');
+    const dateRangeLabel = document.getElementById('dateRangeLabel');
 
-            if (trackerDates.length > 0) {
-                const lastDoc = trackerDates[trackerDates.length - 1];
-                nextOrder = (lastDoc.order || 0) + 1;
-                
-                // Use stored timestamp if available, otherwise parse last dateStr
-                let lastTimestamp = lastDoc.timestamp;
-                if (!lastTimestamp) {
-                    const parts = lastDoc.dateStr.split(' ');
-                    const lastNum = parseInt(parts[1]) || 23;
-                    const d = new Date();
-                    d.setDate(lastNum);
-                    lastTimestamp = d.getTime();
-                }
-                
-                const nextDate = new Date(lastTimestamp + 86400000);
-                const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-                nextDateStr = `${daysOfWeek[nextDate.getDay()]} ${nextDate.getDate()}`;
-                nextTimestamp = nextDate.getTime();
-            } else {
-                const today = new Date();
-                const day = today.getDay();
-                const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-                const monday = new Date(today.setDate(diff));
-                monday.setHours(12, 0, 0, 0);
-                const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-                nextDateStr = `${daysOfWeek[monday.getDay()]} ${monday.getDate()}`;
-                nextTimestamp = monday.getTime();
-            }
+    if (prevMonthBtn) {
+        prevMonthBtn.addEventListener('click', () => {
+            selectedMonthMode = 'previous';
+            dateRangeLabel.textContent = 'Previous Month';
+            generateMonthDates(selectedMonthMode);
+        });
+    }
 
-            try {
-                await db.collection('tracker_dates').add({
-                    dateStr: nextDateStr,
-                    order: nextOrder,
-                    timestamp: nextTimestamp
-                });
-                showToast('Row Extended', `Added date row ${nextDateStr}.`, 'success');
-            } catch (err) {
-                console.error(err);
-                showToast('Error', 'Failed to add date row.', 'danger');
-            }
+    if (currentMonthBtn) {
+        currentMonthBtn.addEventListener('click', () => {
+            selectedMonthMode = 'current';
+            dateRangeLabel.textContent = 'Current Month';
+            generateMonthDates(selectedMonthMode);
         });
     }
 

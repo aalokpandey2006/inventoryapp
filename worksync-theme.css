@@ -2,10 +2,10 @@
 
 :root {
   /* Slate & Teal Color Palette */
-  --bg-color: #0f172a;
-  --surface-color: #1e293b;
+  --bg-color: #24272b;
+  --surface-color: #24272b;
   --surface-hover: #334155;
-  --border-color: #334155;
+  --border-color: rgba(148, 163, 184, 0.2);
   
   --primary-color: #2dd4bf;
   --on-primary: #0f172a;
@@ -20,16 +20,16 @@
   --text-muted: #94a3b8;
   --text-secondary: #94a3b8; 
   
-  --danger-color: #ef4444;
-  --warn-color: #fb923c;
+  --danger-color: #f43f5e;
+  --warn-color: #f59e0b;
   
   /* Status Colors */
   --status-in-progress-bg: rgba(239, 68, 68, 0.1);
-  --status-in-progress-text: #ef4444;
+  --status-in-progress-text: #f43f5e;
   --status-completed-bg: rgba(45, 212, 191, 0.1);
   --status-completed-text: #2dd4bf;
   --status-blocked-bg: rgba(239, 68, 68, 0.1);
-  --status-blocked-text: #ef4444;
+  --status-blocked-text: #f43f5e;
 }
 
 * {
@@ -501,7 +501,11 @@ header {
   background-color: rgba(45, 212, 191, 0.05);
 }
 
-.task-card-item.in-progress,
+.task-card-item.in-progress {
+  border-color: var(--warn-color);
+  background-color: rgba(245, 158, 11, 0.05);
+}
+
 .task-card-item.blocked {
   border-color: var(--danger-color);
   background-color: rgba(239, 68, 68, 0.05);
@@ -809,4 +813,240 @@ header {
     grid-template-columns: 80px 1fr 40px;
     gap: 0.5rem;
   }
+}
+
+/* =========================================================
+   Stock Strip Indicators (Symbolic Containers)
+   ========================================================= */
+.indicator-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.indicator-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(45, 212, 191, 0.15);
+}
+
+.indicator-item.low-stock {
+    border-color: var(--danger-color);
+    background: rgba(244, 63, 94, 0.05);
+}
+
+.indicator-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.indicator-dot.good {
+    background-color: var(--primary-color);
+    box-shadow: 0 0 8px var(--primary-color);
+}
+
+.indicator-dot.low {
+    background-color: var(--danger-color);
+    box-shadow: 0 0 8px var(--danger-color);
+    animation: pulseFill 1.5s infinite;
+}
+
+.indicator-name {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.indicator-val {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* =========================================================
+   Warehouse Product Cards (New UI)
+   ========================================================= */
+.wh-product-card {
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    transition: border-color 0.2s ease;
+}
+
+.wh-product-card:hover {
+    border-color: rgba(148, 163, 184, 0.5); /* subtle hover border */
+}
+
+.wh-product-img-box {
+    width: 160px;
+    height: 160px;
+    background-color: var(--surface-color);
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    margin-right: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wh-product-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.9;
+}
+
+.wh-product-details {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    justify-content: space-between;
+    height: 160px;
+}
+
+.wh-sku-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.wh-sku-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.wh-sku-dot.good {
+    background-color: var(--primary-color);
+}
+
+.wh-sku-dot.low {
+    background-color: var(--danger-color);
+    box-shadow: 0 0 5px var(--danger-color);
+    animation: pulseFill 1.5s infinite;
+}
+
+.wh-sku-text {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.wh-sku-text.good { color: var(--primary-color); }
+.wh-sku-text.low { color: var(--danger-color); }
+
+.wh-product-title {
+    font-size: 1.125rem; /* 18px */
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+    line-height: 1.2;
+}
+
+.wh-product-subtitle {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.wh-product-tags {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: auto;
+}
+
+.wh-tag {
+    padding: 0.25rem 0.5rem;
+    background-color: var(--surface-hover);
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.wh-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-left: 1rem;
+    flex-shrink: 0;
+}
+
+.wh-metric-box {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem;
+    width: 80px;
+    height: 76px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    position: relative;
+}
+
+.wh-metric-box:hover {
+    background-color: var(--surface-hover);
+    border-color: var(--primary-color);
+}
+
+.wh-metric-label {
+    font-size: 9px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 0.25rem;
+    line-height: 1.1;
+}
+
+.wh-metric-value {
+    font-size: 1.125rem; /* 18px */
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+}
+
+.wh-metric-box .field-input {
+    width: 100%;
+    padding: 2px;
+    font-size: 0.9rem;
+    text-align: center;
+    background: var(--bg-color);
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.wh-metric-box .btn-save-field {
+    background: var(--primary-color);
+    color: var(--on-primary);
+    border: none;
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-weight: bold;
 }

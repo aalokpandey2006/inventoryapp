@@ -61,6 +61,9 @@
                     <li class="nav-item" data-section="tasks" id="nav-tasks" style="display: none;">
                         <span class="nav-label">Task Tracker</span>
                     </li>
+                    <li class="nav-item" data-section="wages" id="nav-wages" style="display: none;">
+                        <span class="nav-label">Wages Dashboard</span>
+                    </li>
                 </ul>
             </div>
             <div class="sidebar-footer">
@@ -115,7 +118,11 @@
                 </div>
 
                 <main>
-                    <div class="controls">
+                    <div class="controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div class="metric-box" style="margin-bottom: 0; display: flex; flex-direction: column; align-items: flex-start; padding: 0.5rem 1rem;">
+                            <div class="metric-label">Dishwasher - Out for Delivery</div>
+                            <div class="metric-value" id="dishwashDeliveryQty" style="font-size: 1.25rem; color: var(--primary-color);">0</div>
+                        </div>
                         <button id="addRowBtn" class="btn-primary">+ Add New Task</button>
                     </div>
                     <div class="table-container">
@@ -220,6 +227,10 @@
                             <div class="metric-value" id="trackerTotalHours">0.0</div>
                         </div>
                         <div class="metric-box">
+                            <div class="metric-label">Total Wages (Rs)</div>
+                            <div class="metric-value" id="trackerTotalWages" style="color: var(--primary-color);">0</div>
+                        </div>
+                        <div class="metric-box">
                             <div class="metric-label">Tasks Done</div>
                             <div class="metric-value" id="trackerTasksDone">0</div>
                         </div>
@@ -230,16 +241,31 @@
                 <!-- Grid Navigation & Filters -->
                 <div class="grid-controls-row">
                     <div class="grid-navigation">
-                        <button class="btn-stepper" id="prevWeekBtn">&lt;</button>
-                        <span class="date-range-label" id="dateRangeLabel">Oct 23 - Oct 29, 2023</span>
-                        <button class="btn-stepper" id="nextWeekBtn">&gt;</button>
-                        <button class="btn-today" id="todayBtn">Today</button>
+                        <button class="btn-stepper" id="prevMonthBtn">Previous Month (29-30)</button>
+                        <span class="date-range-label" id="dateRangeLabel" style="font-weight: bold; font-size: 1.1rem; color: var(--primary-color);">Current Month</span>
+                        <button class="btn-today" id="currentMonthBtn">Current Month (1-31)</button>
                     </div>
 
                     <div class="filter-group">
                         <span class="filter-label">Filter by Day:</span>
                         <select class="select-filter" id="dayFilter">
                             <option value="all">All Days</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <span class="filter-label">Member:</span>
+                        <select class="select-filter" id="memberFilter">
+                            <option value="all">All Members</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <span class="filter-label">Wage Period:</span>
+                        <select class="select-filter" id="wagePeriodFilter">
+                            <option value="all">All Time</option>
+                            <option value="7">Last 7 Days</option>
+                            <option value="15">Last 15 Days</option>
                         </select>
                     </div>
 
@@ -260,8 +286,8 @@
                 </div>
 
                 <!-- Calendar Work Grid -->
-                <div class="grid-scroll-container">
-                    <table class="calendar-grid-table">
+                <div class="grid-scroll-container" style="overflow-x: auto; max-width: 100%;">
+                    <table class="calendar-grid-table" style="min-width: 800px;">
                         <thead>
                             <tr id="gridHeaderRow">
                                 <th>Date</th>
@@ -276,7 +302,6 @@
 
                 <!-- Control Buttons for extending calendar -->
                 <div class="grid-actions-row">
-                    <button class="btn-grid-action" id="addDateRowBtn">+ Add Date Row</button>
                     <button class="btn-grid-action" id="addMemberBtn">+ Add Member</button>
                 </div>
 
@@ -301,12 +326,66 @@
                                 <th>Member</th>
                                 <th>Status</th>
                                 <th>Hours</th>
+                                <th>Wages</th>
                             </tr>
                         </thead>
                         <tbody id="recentLogsBody">
                             <!-- Dynamic rows -->
                         </tbody>
                     </table>
+                </div>
+            </section>
+            <!-- ===========================
+                 WAGES SECTION
+                 =========================== -->
+            <section id="wages-section" class="page-section">
+                <div class="warehouse-header">
+                    <div>
+                        <h2 class="warehouse-title">Wages Dashboard</h2>
+                        <p class="warehouse-subtitle">Track and filter calculated wages per person.</p>
+                    </div>
+                </div>
+                
+                <div class="tracker-dashboard">
+                    <div class="dashboard-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem;">
+                        <div class="filter-group">
+                            <label for="wagesMemberFilter">Member:</label>
+                            <select id="wagesMemberFilter" class="form-input">
+                                <option value="all">All Members</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="wagesPeriodFilter">Period:</label>
+                            <select id="wagesPeriodFilter" class="form-input">
+                                <option value="current_month">Current Month</option>
+                                <option value="7_days">Last 7 Days</option>
+                                <option value="15_days">Last 15 Days</option>
+                                <option value="all">All Time</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-cards" style="margin-bottom: 1.5rem;">
+                        <div class="metric-box">
+                            <div class="metric-label">Total Wages For Period</div>
+                            <div class="metric-value" id="wagesTotalDisplay">₹0</div>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="wagesTable">
+                            <thead>
+                                <tr>
+                                    <th>Member</th>
+                                    <th>Total Tasks</th>
+                                    <th>Total Wages (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wagesBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
         </div>
@@ -339,20 +418,66 @@
                     <label for="taskName">Task Name</label>
                     <input type="text" id="taskName" required>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="form-group">
-                        <label for="taskHours">Hours Logged</label>
-                        <input type="number" id="taskHours" step="0.5" min="0.5" max="24" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="taskStatus">Status</label>
-                        <select id="taskStatus" required>
-                            <option value="completed" selected>Completed</option>
-                            <option value="in-progress">In Progress</option>
-                            <option value="blocked">Blocked</option>
-                        </select>
+                
+                <div class="form-group">
+                    <label for="wageCategory">Task Category</label>
+                    <select id="wageCategory" required onchange="toggleWageFields()">
+                        <option value="production" selected>Production</option>
+                        <option value="delivery">Delivery</option>
+                        <option value="meeting">Meeting a Client</option>
+                    </select>
+                </div>
+
+                <div id="productionFields" style="display: block;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label for="taskHours">Hours Logged</label>
+                            <input type="number" id="taskHours" step="0.5" min="0" max="24">
+                        </div>
+                        <div class="form-group">
+                            <label for="taskStatus">Status</label>
+                            <select id="taskStatus" required>
+                                <option value="completed" selected>Completed</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="blocked">Blocked</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
+
+                <div id="deliveryFields" style="display: none;">
+                    <div class="form-group">
+                        <label class="toggle-label" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="hasVehicle" style="width:auto;cursor:pointer;accent-color:var(--accent-color);">
+                            <span>Used Personal Vehicle for Delivery?</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="meetingFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="commissionAmount">Expected Commission (Rs)</label>
+                        <input type="number" id="commissionAmount" step="1" min="0" placeholder="0">
+                        <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">Commission is pending next update.</small>
+                    </div>
+                </div>
+
+                <script>
+                    function toggleWageFields() {
+                        const cat = document.getElementById('wageCategory').value;
+                        document.getElementById('productionFields').style.display = (cat === 'production') ? 'block' : 'none';
+                        document.getElementById('deliveryFields').style.display = (cat === 'delivery') ? 'block' : 'none';
+                        document.getElementById('meetingFields').style.display = (cat === 'meeting') ? 'block' : 'none';
+                        
+                        if(cat === 'production') {
+                            document.getElementById('taskHours').setAttribute('required', 'true');
+                        } else {
+                            document.getElementById('taskHours').removeAttribute('required');
+                        }
+                    }
+                    // Run once to set initial state
+                    setTimeout(toggleWageFields, 100);
+                </script>
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                     <button type="submit" class="btn-modal-submit" style="flex: 2;">Save Log Entry</button>
                     <button type="button" class="btn-danger" id="deleteTaskBtn" style="flex: 1; display: none; padding: 0.6rem; font-weight: 600; font-size: 0.85rem; border-radius: 4px;">Delete</button>
@@ -441,7 +566,10 @@
                         </select>
                     </div>
                 </div>
-                <button type="submit" class="btn-primary btn-block">Add New Task</button>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" class="btn-primary" style="flex: 1;" id="saveTaskBtn">Add New Task</button>
+                    <button type="button" class="btn-secondary" style="flex: 1; background-color: var(--card-bg); border: 1px solid var(--border-color);" id="saveAndAddAnotherBtn">Save & Add Another</button>
+                </div>
             </form>
         </div>
     </div>
