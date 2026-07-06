@@ -1210,7 +1210,11 @@ document.addEventListener('DOMContentLoaded', () => {
     db.collection('tracker_tasks').orderBy('createdAt', 'desc').onSnapshot(snap => {
         trackerTasks = [];
         snap.forEach(doc => {
-            trackerTasks.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            const t = { id: doc.id, ...data };
+            t._logicalDate = getTaskLogicalDate(t);
+            t._calculatedCost = getTaskCalculatedCost(t);
+            trackerTasks.push(t);
         });
         renderCalendarGrid();
         renderComparisonChart();
@@ -1501,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let doneCount = 0;
         filteredTasks.forEach(t => {
             sumHours += parseFloat(t.hours) || 0;
-            sumWages += getTaskCalculatedCost(t);
+            sumWages += t._calculatedCost;
             doneCount++;
         });
 
@@ -1563,11 +1567,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedWagePeriodFilter !== 'all') {
             const daysToFilter = parseInt(selectedWagePeriodFilter);
             const cutoffTime = Date.now() - (daysToFilter * 24 * 60 * 60 * 1000);
-            filteredTasks = filteredTasks.filter(t => getTaskLogicalDate(t) >= cutoffTime);
+            filteredTasks = filteredTasks.filter(t => t._logicalDate >= cutoffTime);
         }
 
         // Sort chronologically (newest first for recent logs)
-        filteredTasks.sort((a, b) => getTaskLogicalDate(b) - getTaskLogicalDate(a));
+        filteredTasks.sort((a, b) => b._logicalDate - a._logicalDate);
 
         if (filteredTasks.length === 0) {
             body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:1rem;">No task logs saved.</td></tr>';
@@ -1583,7 +1587,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${task.memberName}</td>
                 <td><span class="task-status-badge ${task.status}">${task.status.replace('-', ' ')}</span></td>
                 <td style="font-weight:700;color:var(--primary-color);">${task.hours || 0}h</td>
-                <td style="font-weight:700;color:var(--accent-color);">₹${getTaskCalculatedCost(task)}</td>
+                <td style="font-weight:700;color:var(--accent-color);">₹${task._calculatedCost}</td>
             `;
             body.appendChild(tr);
         });
@@ -1623,15 +1627,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = new Date();
         if (selectedWagesDashboardPeriodFilter === '7_days') {
             const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
-            periodFilteredTasks = periodFilteredTasks.filter(t => getTaskLogicalDate(t) >= cutoff);
+            periodFilteredTasks = periodFilteredTasks.filter(t => t._logicalDate >= cutoff);
         } else if (selectedWagesDashboardPeriodFilter === '15_days') {
             const cutoff = Date.now() - (15 * 24 * 60 * 60 * 1000);
-            periodFilteredTasks = periodFilteredTasks.filter(t => getTaskLogicalDate(t) >= cutoff);
+            periodFilteredTasks = periodFilteredTasks.filter(t => t._logicalDate >= cutoff);
         } else if (selectedWagesDashboardPeriodFilter === 'current_month') {
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
             const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
             periodFilteredTasks = periodFilteredTasks.filter(t => {
-                const ts = getTaskLogicalDate(t);
+                const ts = t._logicalDate;
                 return ts >= startOfMonth && ts <= endOfMonth;
             });
         }
@@ -1643,7 +1647,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         periodFilteredTasks.forEach(task => {
-            let cost = getTaskCalculatedCost(task);
+            let cost = task._calculatedCost;
             if (memberWages[task.memberName] !== undefined) {
                 memberWages[task.memberName].tasks += 1;
                 memberWages[task.memberName].total += cost;
@@ -1665,11 +1669,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sort by logical calendar date descending (newest first, so 1st of July is at the bottom)
         const sortedDetailTasks = [...detailFilteredTasks].sort((a, b) => {
-            return getTaskLogicalDate(b) - getTaskLogicalDate(a);
+            return b._logicalDate - a._logicalDate;
         });
 
         sortedDetailTasks.forEach(task => {
-            let cost = getTaskCalculatedCost(task);
+            let cost = task._calculatedCost;
 
             if (task.wageCategory === 'production') productionTotal += cost;
             else if (task.wageCategory === 'delivery') deliveryTotal += cost;
@@ -1800,6 +1804,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pFields) pFields.style.display = (cat === 'production') ? 'block' : 'none';
         if (dFields) dFields.style.display = (cat === 'delivery') ? 'block' : 'none';
         if (mFields) mFields.style.display = (cat === 'meeting') ? 'block' : 'none';
+        
+        const taskHours = document.getElementById('taskHours');
+        if (taskHours) {
+            if (cat === 'production') {
+                taskHours.setAttribute('required', 'true');
+            } else {
+                taskHours.removeAttribute('required');
+            }
+        }
     };
 
     window.startEditTask = (taskId) => {

@@ -470,7 +470,7 @@
                         </div>
                         <div class="form-group">
                             <label for="taskStatus">Status</label>
-                            <select id="taskStatus" required>
+                            <select id="taskStatus">
                                 <option value="completed" selected>Completed</option>
                                 <option value="in-progress">In Progress</option>
                                 <option value="blocked">Blocked</option>
@@ -497,20 +497,8 @@
                 </div>
 
                 <script>
-                    function toggleWageFields() {
-                        const cat = document.getElementById('wageCategory').value;
-                        document.getElementById('productionFields').style.display = (cat === 'production') ? 'block' : 'none';
-                        document.getElementById('deliveryFields').style.display = (cat === 'delivery') ? 'block' : 'none';
-                        document.getElementById('meetingFields').style.display = (cat === 'meeting') ? 'block' : 'none';
-                        
-                        if(cat === 'production') {
-                            document.getElementById('taskHours').setAttribute('required', 'true');
-                        } else {
-                            document.getElementById('taskHours').removeAttribute('required');
-                        }
-                    }
                     // Run once to set initial state
-                    setTimeout(toggleWageFields, 100);
+                    setTimeout(() => { if (typeof toggleWageFields === 'function') toggleWageFields(); }, 100);
                 </script>
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                     <button type="submit" class="btn-modal-submit" style="flex: 2;">Save Log Entry</button>
