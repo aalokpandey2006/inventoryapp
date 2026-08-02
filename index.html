@@ -249,9 +249,7 @@
                     <div class="filter-group">
                         <span class="filter-label">Wage Period:</span>
                         <select class="select-filter" id="wagePeriodFilter">
-                            <option value="all">All Time</option>
-                            <option value="7">Last 7 Days</option>
-                            <option value="15">Last 15 Days</option>
+                            <!-- Populated dynamically by JS -->
                         </select>
                     </div>
 
@@ -293,7 +291,12 @@
 
                 <!-- Workload Comparison Section -->
                 <div class="comparison-section">
-                    <h3 class="comparison-title">Team Workload Comparison</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 class="comparison-title" style="margin-bottom: 0;">Team Workload Comparison</h3>
+                        <select class="select-filter" id="comparisonPeriodFilter" style="min-width: 150px;">
+                            <!-- Populated dynamically by JS -->
+                        </select>
+                    </div>
                     <div class="comparison-list" id="comparisonList">
                         <!-- Loaded dynamically -->
                     </div>
@@ -334,12 +337,9 @@
                                <div class="tracker-dashboard">
                     <div class="dashboard-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem;">
                         <div class="filter-group">
-                            <label for="wagesPeriodFilter">Period:</label>
-                            <select id="wagesPeriodFilter" class="form-input">
-                                <option value="current_month">Current Month</option>
-                                <option value="7_days">Last 7 Days</option>
-                                <option value="15_days">Last 15 Days</option>
-                                <option value="all">All Time</option>
+                            <span class="filter-label">Period:</span>
+                            <select id="wagesPeriodFilter" class="select-filter">
+                                <!-- Populated dynamically by JS -->
                             </select>
                         </div>
                     </div>
@@ -393,9 +393,9 @@
                         <div>
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                 <h3 style="color: var(--text-primary); font-size: 1.1rem; margin: 0;">Detailed Wage Log</h3>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <label for="wagesMemberFilter" style="color: var(--text-secondary); font-size: 0.9rem;">Member:</label>
-                                    <select id="wagesMemberFilter" class="form-input" style="padding: 0.3rem 0.5rem; font-size: 0.9rem;">
+                                <div class="filter-group">
+                                    <span class="filter-label">Member:</span>
+                                    <select id="wagesMemberFilter" class="select-filter">
                                         <option value="all">All Members</option>
                                     </select>
                                 </div>
@@ -462,11 +462,11 @@
                     </select>
                 </div>
 
-                <div id="productionFields" style="display: block;">
+                <div id="commonFields">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label for="taskHours">Hours Logged</label>
-                            <input type="number" id="taskHours" step="0.5" min="0" max="24">
+                            <input type="number" id="taskHours" step="0.5" min="0" max="24" required>
                         </div>
                         <div class="form-group">
                             <label for="taskStatus">Status</label>

@@ -1216,6 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             t._calculatedCost = getTaskCalculatedCost(t);
             trackerTasks.push(t);
         });
+        populateMonthFilters();
         renderCalendarGrid();
         renderComparisonChart();
         renderRecentLogs();
@@ -1258,8 +1259,97 @@ document.addEventListener('DOMContentLoaded', () => {
     // Filter Triggers
     let selectedMemberFilter = 'all';
     let selectedWagePeriodFilter = 'all';
+    let selectedComparisonPeriodFilter = 'all';
     let selectedWagesDashboardMemberFilter = 'all';
-    let selectedWagesDashboardPeriodFilter = 'current_month';
+    let selectedWagesDashboardPeriodFilter = 'all';
+
+    function populateMonthFilters() {
+        const wageFilter = document.getElementById('wagePeriodFilter');
+        const wagesFilter = document.getElementById('wagesPeriodFilter');
+        const compFilter = document.getElementById('comparisonPeriodFilter');
+        
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const today = new Date();
+        
+        let optionsHtml = '<option value="all">All Time</option>';
+        optionsHtml += `<option value="this_year">This Year (${today.getFullYear()})</option>`;
+        
+        // Collect unique months from trackerTasks (only months where tasks/hours have been logged)
+        const loggedMonthsMap = new Map();
+        trackerTasks.forEach(t => {
+            if (t._logicalDate) {
+                const dateObj = new Date(t._logicalDate);
+                const y = dateObj.getFullYear();
+                const m = dateObj.getMonth();
+                const key = `${y}-${m}`;
+                if (!loggedMonthsMap.has(key)) {
+                    loggedMonthsMap.set(key, { y, m, key, label: `${monthNames[m]} ${y}` });
+                }
+            }
+        });
+
+        // Convert map values to array and sort ascending chronologically (oldest to newest)
+        const sortedLoggedMonths = Array.from(loggedMonthsMap.values()).sort((a, b) => {
+            if (a.y !== b.y) return a.y - b.y;
+            return a.m - b.m;
+        });
+
+        sortedLoggedMonths.forEach(item => {
+            optionsHtml += `<option value="${item.key}">${item.label}</option>`;
+        });
+        
+        const prevWageVal = wageFilter ? wageFilter.value : selectedWagePeriodFilter;
+        const prevWagesVal = wagesFilter ? wagesFilter.value : selectedWagesDashboardPeriodFilter;
+        const prevCompVal = compFilter ? compFilter.value : selectedComparisonPeriodFilter;
+
+        if (wageFilter) wageFilter.innerHTML = optionsHtml;
+        if (wagesFilter) wagesFilter.innerHTML = optionsHtml;
+        if (compFilter) compFilter.innerHTML = optionsHtml;
+        
+        const currentMonthKey = `${today.getFullYear()}-${today.getMonth()}`;
+        const hasCurrentMonthInLogged = loggedMonthsMap.has(currentMonthKey);
+        const validKeys = ['all', 'this_year', ...sortedLoggedMonths.map(i => i.key)];
+
+        if (wageFilter) {
+            if (validKeys.includes(prevWageVal)) {
+                wageFilter.value = prevWageVal;
+            } else if (hasCurrentMonthInLogged) {
+                wageFilter.value = currentMonthKey;
+            } else if (sortedLoggedMonths.length > 0) {
+                wageFilter.value = sortedLoggedMonths[sortedLoggedMonths.length - 1].key;
+            } else {
+                wageFilter.value = 'all';
+            }
+            selectedWagePeriodFilter = wageFilter.value;
+        }
+
+        if (wagesFilter) {
+            if (validKeys.includes(prevWagesVal)) {
+                wagesFilter.value = prevWagesVal;
+            } else if (hasCurrentMonthInLogged) {
+                wagesFilter.value = currentMonthKey;
+            } else if (sortedLoggedMonths.length > 0) {
+                wagesFilter.value = sortedLoggedMonths[sortedLoggedMonths.length - 1].key;
+            } else {
+                wagesFilter.value = 'all';
+            }
+            selectedWagesDashboardPeriodFilter = wagesFilter.value;
+        }
+
+        if (compFilter) {
+            if (validKeys.includes(prevCompVal)) {
+                compFilter.value = prevCompVal;
+            } else if (hasCurrentMonthInLogged) {
+                compFilter.value = currentMonthKey;
+            } else if (sortedLoggedMonths.length > 0) {
+                compFilter.value = sortedLoggedMonths[sortedLoggedMonths.length - 1].key;
+            } else {
+                compFilter.value = 'all';
+            }
+            selectedComparisonPeriodFilter = compFilter.value;
+        }
+    }
+    populateMonthFilters();
 
     function updateMemberFilterDropdown() {
         const filter = document.getElementById('memberFilter');
@@ -1308,6 +1398,14 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedWagePeriodFilter = e.target.value;
             renderComparisonChart();
             renderRecentLogs();
+        });
+    }
+
+    const comparisonPeriodFilter = document.getElementById('comparisonPeriodFilter');
+    if (comparisonPeriodFilter) {
+        comparisonPeriodFilter.addEventListener('change', (e) => {
+            selectedComparisonPeriodFilter = e.target.value;
+            renderComparisonChart();
         });
     }
 
@@ -1387,6 +1485,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const gridFragment = document.createDocumentFragment();
+
         filteredDates.forEach(date => {
             const tr = document.createElement('tr');
             
@@ -1439,8 +1539,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 tr.appendChild(td);
             });
 
-            gridBody.appendChild(tr);
+            gridFragment.appendChild(tr);
         });
+
+        if (gridBody) gridBody.appendChild(gridFragment);
     }
 
     // Member updaters
@@ -1486,10 +1588,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedMemberFilter !== 'all') {
             filteredTasks = filteredTasks.filter(t => t.memberName === selectedMemberFilter);
         }
-        if (selectedWagePeriodFilter !== 'all') {
-            const daysToFilter = parseInt(selectedWagePeriodFilter);
-            const cutoffTime = Date.now() - (daysToFilter * 24 * 60 * 60 * 1000);
-            filteredTasks = filteredTasks.filter(t => getTaskLogicalDate(t) >= cutoffTime);
+        if (selectedComparisonPeriodFilter === 'this_year') {
+            const today = new Date();
+            const startOfYear = new Date(today.getFullYear(), 0, 1).getTime();
+            const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+            filteredTasks = filteredTasks.filter(t => {
+                const ts = getTaskLogicalDate(t);
+                return ts >= startOfYear && ts <= endOfYear;
+            });
+        } else if (selectedComparisonPeriodFilter !== 'all') {
+            const [yearStr, monthStr] = selectedComparisonPeriodFilter.split('-');
+            const y = parseInt(yearStr, 10);
+            const m = parseInt(monthStr, 10);
+            const startOfMonth = new Date(y, m, 1).getTime();
+            const endOfMonth = new Date(y, m + 1, 0, 23, 59, 59, 999).getTime();
+            filteredTasks = filteredTasks.filter(t => {
+                const ts = getTaskLogicalDate(t);
+                return ts >= startOfMonth && ts <= endOfMonth;
+            });
         }
 
         filteredTasks.forEach(task => {
@@ -1564,10 +1680,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedMemberFilter !== 'all') {
             filteredTasks = filteredTasks.filter(t => t.memberName === selectedMemberFilter);
         }
-        if (selectedWagePeriodFilter !== 'all') {
-            const daysToFilter = parseInt(selectedWagePeriodFilter);
-            const cutoffTime = Date.now() - (daysToFilter * 24 * 60 * 60 * 1000);
-            filteredTasks = filteredTasks.filter(t => t._logicalDate >= cutoffTime);
+        if (selectedWagePeriodFilter === 'this_year') {
+            const today = new Date();
+            const startOfYear = new Date(today.getFullYear(), 0, 1).getTime();
+            const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+            filteredTasks = filteredTasks.filter(t => {
+                const ts = t._logicalDate;
+                return ts >= startOfYear && ts <= endOfYear;
+            });
+        } else if (selectedWagePeriodFilter !== 'all') {
+            const [yearStr, monthStr] = selectedWagePeriodFilter.split('-');
+            const y = parseInt(yearStr, 10);
+            const m = parseInt(monthStr, 10);
+            const startOfMonth = new Date(y, m, 1).getTime();
+            const endOfMonth = new Date(y, m + 1, 0, 23, 59, 59, 999).getTime();
+            filteredTasks = filteredTasks.filter(t => {
+                const ts = t._logicalDate;
+                return ts >= startOfMonth && ts <= endOfMonth;
+            });
         }
 
         // Sort chronologically (newest first for recent logs)
@@ -1624,16 +1754,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // 1. Filter to valid categories + period
         let periodFilteredTasks = trackerTasks.filter(t => VALID_CATEGORIES.includes(t.wageCategory));
 
-        const now = new Date();
-        if (selectedWagesDashboardPeriodFilter === '7_days') {
-            const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
-            periodFilteredTasks = periodFilteredTasks.filter(t => t._logicalDate >= cutoff);
-        } else if (selectedWagesDashboardPeriodFilter === '15_days') {
-            const cutoff = Date.now() - (15 * 24 * 60 * 60 * 1000);
-            periodFilteredTasks = periodFilteredTasks.filter(t => t._logicalDate >= cutoff);
-        } else if (selectedWagesDashboardPeriodFilter === 'current_month') {
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+        if (selectedWagesDashboardPeriodFilter === 'this_year') {
+            const today = new Date();
+            const startOfYear = new Date(today.getFullYear(), 0, 1).getTime();
+            const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+            periodFilteredTasks = periodFilteredTasks.filter(t => {
+                const ts = t._logicalDate;
+                return ts >= startOfYear && ts <= endOfYear;
+            });
+        } else if (selectedWagesDashboardPeriodFilter !== 'all') {
+            const [yearStr, monthStr] = selectedWagesDashboardPeriodFilter.split('-');
+            const y = parseInt(yearStr, 10);
+            const m = parseInt(monthStr, 10);
+            const startOfMonth = new Date(y, m, 1).getTime();
+            const endOfMonth = new Date(y, m + 1, 0, 23, 59, 59, 999).getTime();
             periodFilteredTasks = periodFilteredTasks.filter(t => {
                 const ts = t._logicalDate;
                 return ts >= startOfMonth && ts <= endOfMonth;
@@ -1671,6 +1805,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortedDetailTasks = [...detailFilteredTasks].sort((a, b) => {
             return b._logicalDate - a._logicalDate;
         });
+
+        const detailsFragment = document.createDocumentFragment();
 
         sortedDetailTasks.forEach(task => {
             let cost = task._calculatedCost;
@@ -1711,9 +1847,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td style="font-weight:700;color:var(--accent-color);">₹${cost.toFixed(2)}</td>
                     <td><span ${canToggle} style="padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;letter-spacing:0.5px;${badgeStyle}">${isPaid ? '✓ Paid' : '⏳ Pending'}</span></td>
                 `;
-                detailsBody.appendChild(tr);
+                detailsFragment.appendChild(tr);
             }
         });
+        
+        if (detailsBody) detailsBody.appendChild(detailsFragment);
 
         // Update displays
         if (totalDisplay) totalDisplay.textContent = `₹${grandTotal.toFixed(2)}`;
@@ -1737,6 +1875,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const summaryFragment = document.createDocumentFragment();
+
         sortedMembers.forEach(member => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -1744,8 +1884,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${member.tasks} tasks</td>
                 <td style="font-weight:700;color:var(--accent-color);">₹${member.total.toFixed(2)}</td>
             `;
-            body.appendChild(tr);
+            summaryFragment.appendChild(tr);
         });
+        
+        if (body) body.appendChild(summaryFragment);
 
         if (sortedDetailTasks.length === 0 && detailsBody) {
             detailsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:1rem;">No detailed records found for this member/period.</td></tr>';
@@ -1798,21 +1940,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.toggleWageFields = function() {
         const cat = document.getElementById('wageCategory').value;
-        const pFields = document.getElementById('productionFields');
         const dFields = document.getElementById('deliveryFields');
         const mFields = document.getElementById('meetingFields');
-        if (pFields) pFields.style.display = (cat === 'production') ? 'block' : 'none';
         if (dFields) dFields.style.display = (cat === 'delivery') ? 'block' : 'none';
         if (mFields) mFields.style.display = (cat === 'meeting') ? 'block' : 'none';
-        
-        const taskHours = document.getElementById('taskHours');
-        if (taskHours) {
-            if (cat === 'production') {
-                taskHours.setAttribute('required', 'true');
-            } else {
-                taskHours.removeAttribute('required');
-            }
-        }
     };
 
     window.startEditTask = (taskId) => {
