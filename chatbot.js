@@ -9,20 +9,13 @@
     // ==========================================
     // 1. CHATBOT STATE & CONFIGURATION
     // ==========================================
-    const CHATBOT_CONFIG = {
-        storageKeyApiKey: 'worksync_ai_gemini_key',
-        storageKeyModel: 'worksync_ai_model',
-        storageKeyEngine: 'worksync_ai_engine', // 'smart_nlp' or 'gemini_llm'
+    const CHATBOT_CONFIG = { // 'smart_nlp' or 'gemini_llm'
         storageKeyHistory: 'worksync_ai_chat_history',
-        defaultModel: 'gemini-1.5-flash',
     };
 
     const state = {
         isOpen: false,
         isBusy: false,
-        engine: localStorage.getItem(CHATBOT_CONFIG.storageKeyEngine) || 'smart_nlp',
-        apiKey: localStorage.getItem(CHATBOT_CONFIG.storageKeyApiKey) || '',
-        model: localStorage.getItem(CHATBOT_CONFIG.storageKeyModel) || CHATBOT_CONFIG.defaultModel,
         messages: [],
         pendingAction: null, // For destructive confirm actions
     };
@@ -439,7 +432,12 @@
         // ----- [CREATE / UPDATE] LOG WORK HOURS (TEAM TRACKER) -----
         async logWorkHours(params) {
             let memberName = (params.memberName || 'Unknown').trim();
-            const taskName = (params.taskName || params.name || 'General Task').trim();
+            // Capitalize first letter properly
+            memberName = memberName.charAt(0).toUpperCase() + memberName.slice(1).toLowerCase();
+
+            let taskName = (params.taskName || params.name || 'General Task').trim();
+            taskName = taskName.charAt(0).toUpperCase() + taskName.slice(1);
+
             const wageCategory = (params.wageCategory || 'production').toLowerCase();
             const hours = parseFloat(params.hours) || 4;
             const status = (params.status || 'completed').toLowerCase();
@@ -632,551 +630,355 @@
     };
 
     // ==========================================
-    // 3. SMART BUILT-IN NLP INTENT PARSER
+    // 3. GEMINI AI ENGINE (Direct Serverless API)
     // ==========================================
-    const SmartNLP = {
-        async process(userInput) {
-            const text = userInput.trim();
-            const lower = text.toLowerCase();
+    const GeminiCloudFunction = {
+        getApiKey() {
+            return localStorage.getItem('worksync_gemini_api_key') || 
+                   (typeof firebaseConfig !== 'undefined' && firebaseConfig.apiKey ? firebaseConfig.apiKey : '');
+        },
 
-            // --- INTENT 6A: ADD / INCREMENT WAREHOUSE STOCK ---
-            // Must come BEFORE delivery task intent to avoid "Add 50 stock to Floor Cleaner" being mis-routed
-            // e.g. "Add 50 stock to Floor Cleaner" or "Increase stock of Phenyl by 25" or "Restock dishwasher 30"
-            if ((lower.includes('add') || lower.includes('increase') || lower.includes('restock')) &&
-                (lower.includes('stock') || lower.includes('raw material'))) {
+        async fetchSupportedModels(apiKey) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+                if (!data.models || !Array.isArray(data.models)) return [];
 
-                let category = 'Floor Cleaner';
-                for (const cat of CATEGORIES) {
-                    for (const a of cat.aliases) {
-                        if (lower.includes(a)) { category = cat.name; break; }
-                    }
-                }
+                // Filter models that support generateContent
+                const available = data.models
+                    .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+                    .map(m => m.name.replace(/^models\//, ''))
+                    .filter(name => name.includes('flash') || name.includes('pro'));
 
-                let field = 'stockRemaining';
-                if (lower.includes('raw') || lower.includes('material')) field = 'rawMaterialsInInventory';
-
-                let quantity = 10;
-                const qtyMatch6a = text.match(/(\d+(\.\d+)?)\s*(units?|qty|boxes?|bottles?)?/i);
-                if (qtyMatch6a) quantity = parseFloat(qtyMatch6a[1]);
-
-                const res = await ChatbotTools.addWarehouseStock({ category, quantity, field });
-                return { text: res.message };
-            }
-
-            // --- INTENT 6B: STOCK EXCHANGE BETWEEN CATEGORIES ---
-            // e.g. "Exchange 20 Dishwasher for Floor Cleaner" or "Swap 15 Floor Cleaner with Phenyl"
-            if (lower.includes('exchange') || lower.includes('swap') || lower.includes('transfer stock')) {
-                let quantity = 10;
-                const qtyMatch6b = text.match(/(\d+(\.\d+)?)\s*(units?|qty|boxes?|bottles?)?/i);
-                if (qtyMatch6b) quantity = parseFloat(qtyMatch6b[1]);
-
-                const foundCats = [];
-                for (const cat of CATEGORIES) {
-                    for (const a of cat.aliases) {
-                        if (lower.includes(a) && !foundCats.includes(cat.name)) {
-                            foundCats.push(cat.name);
-                            break;
-                        }
-                    }
-                }
-
-                let fromCategory = foundCats[0] || 'Floor Cleaner';
-                let toCategory = foundCats[1] || 'Dishwasher';
-
-                if (foundCats.length < 2) {
-                    const splitMatch = text.match(/(?:exchange|swap|transfer)\s+(?:\d+\s+)?([a-zA-Z\s]+?)\s+(?:for|to|with|into)\s+([a-zA-Z\s]+)/i);
-                    if (splitMatch) {
-                        fromCategory = resolveCategory(splitMatch[1].trim());
-                        toCategory = resolveCategory(splitMatch[2].trim());
-                    }
-                }
-
-                const res = await ChatbotTools.exchangeStock({ fromCategory, toCategory, quantity });
-                return { text: res.message };
-            }
-
-            // --- INTENT 6C: UPDATE/SET WAREHOUSE METRIC ---
-            if ((lower.includes('update') || lower.includes('set')) &&
-                (lower.includes('stock') || lower.includes('threshold') || lower.includes('minimum') || lower.includes('raw material') || lower.includes('production rate'))) {
-
-                let category = 'Floor Cleaner';
-                for (const cat of CATEGORIES) {
-                    for (const a of cat.aliases) {
-                        if (lower.includes(a)) { category = cat.name; break; }
-                    }
-                }
-
-                let field = 'stockRemaining';
-                if (lower.includes('threshold') || lower.includes('minimum') || lower.includes('min')) field = 'minimumStock';
-                else if (lower.includes('raw') || lower.includes('material')) field = 'rawMaterialsInInventory';
-                else if (lower.includes('daily') || lower.includes('rate') || lower.includes('production rate')) field = 'productionRatePerDay';
-
-                const valMatch6c = text.match(/to\s+(\d+(\.\d+)?)|(?:is|set)\s+(\d+(\.\d+)?)|(\d+(\.\d+)?)\s*(?:units)?$/i);
-                let value6c = null;
-                if (valMatch6c) value6c = parseFloat(valMatch6c[1] || valMatch6c[3] || valMatch6c[5]);
-
-                if (value6c === null || isNaN(value6c)) {
-                    return { text: `Please specify the number to set for ${category}. (e.g. *"Update ${category} stock to 100"*).` };
-                }
-
-                const res = await ChatbotTools.updateWarehouseStock({ category, field, value: value6c });
-                return { text: res.message };
-            }
-
-            // --- INTENT 1: CREATE DELIVERY TASK ---
-            if (lower.startsWith('add delivery') || lower.startsWith('create delivery') ||
-                lower.startsWith('add task') || lower.startsWith('create task') ||
-                (lower.startsWith('add ') && (lower.includes('for client') || lower.includes('units') || lower.includes('cleaner') || lower.includes('dishwasher') || lower.includes('phenyl') || lower.includes('handwash')))) {
-
-                // Extract quantity
-                let quantity = 1;
-                const qtyMatch = text.match(/(\d+(\.\d+)?)\s*(units?|bottles?|boxes?|qty|pieces?)?/i);
-                if (qtyMatch) quantity = parseFloat(qtyMatch[1]);
-
-                // Extract Category
-                let category = 'Dishwasher';
-                for (const cat of CATEGORIES) {
-                    for (const a of cat.aliases) {
-                        if (lower.includes(a)) {
-                            category = cat.name;
-                            break;
-                        }
-                    }
-                }
-
-                // Extract Fragrance / Product Name
-                let productName = 'Standard Formula';
-                const fragMatch = text.match(/fragrance\s+([a-zA-Z0-9\s]+?)(?=\s+(for|assigned|priority|client|qty|$))/i) ||
-                                  text.match(/product\s+([a-zA-Z0-9\s]+?)(?=\s+(for|assigned|priority|client|qty|$))/i);
-                if (fragMatch) productName = fragMatch[1].trim();
-
-                // Extract Client
-                let clientName = 'General Client';
-                const clientMatch = text.match(/(?:for\s+client|client|to\s+client|customer|for)\s+([a-zA-Z0-9\s\.\,\-\&]+?)(?=\s+(?:assigned|priority|fragrance|brought|from|by|$))/i);
-                if (clientMatch) {
-                    clientName = clientMatch[1].replace(/^(for\s+client|client|for)\s+/i, '').trim();
-                }
-
-                // Extract Assigned Delivery
-                let assignedDelivery = 'Delivery Team';
-                const assignMatch = text.match(/assigned\s+(?:to\s+)?([a-zA-Z0-9\s]+?)(?=\s+(?:priority|client|fragrance|$))/i);
-                if (assignMatch) assignedDelivery = assignMatch[1].trim();
-
-                // Extract Priority
-                let priority = 'Medium';
-                if (lower.includes('high priority') || lower.includes('priority high')) priority = 'High';
-                else if (lower.includes('low priority') || lower.includes('priority low')) priority = 'Low';
-
-                const res = await ChatbotTools.createDeliveryTask({
-                    category,
-                    productName,
-                    clientName,
-                    quantity,
-                    assignedDelivery,
-                    priority
+                // Sort: flash models first for fast responses, then others
+                available.sort((a, b) => {
+                    if (a.includes('flash') && !b.includes('flash')) return -1;
+                    if (!a.includes('flash') && b.includes('flash')) return 1;
+                    return 0;
                 });
 
-                return {
-                    text: res.message,
-                    cardType: 'task_created',
-                    cardData: res.task
-                };
+                return available;
+            } catch (e) {
+                console.warn('Dynamic model fetch failed, using fallback list:', e);
+                return [];
             }
+        },
 
-            // --- INTENT 2: COMPLETE / MARK DELIVERED ---
-            if (lower.includes('mark delivered') || lower.includes('mark as delivered') || lower.includes('mark completed') || lower.includes('complete delivery') || lower.includes('deliver task')) {
-                const targetQuery = text.replace(/mark\s+(?:as\s+)?(?:delivered|completed)|complete\s+delivery|deliver\s+task|for\s+client|for|task/gi, '').trim();
-                const res = await ChatbotTools.updateDeliveryTask({
-                    query: targetQuery,
-                    markDelivered: true
-                });
-                return { text: res.message };
+        async getRegisteredMembers() {
+            try {
+                if (typeof trackerMembers !== 'undefined' && Array.isArray(trackerMembers) && trackerMembers.length > 0) {
+                    return trackerMembers.map(m => m.name).filter(Boolean);
+                }
+                if (typeof db !== 'undefined') {
+                    const snap = await db.collection('tracker_members').get();
+                    const list = [];
+                    snap.forEach(d => {
+                        const data = d.data();
+                        if (data && data.name) list.push(data.name);
+                    });
+                    return list;
+                }
+            } catch (e) {
+                console.warn('Could not read tracker_members:', e);
             }
-
-            // --- INTENT 3: DELETE DELIVERY TASK (WITH CONFIRMATION) ---
-            if (lower.startsWith('delete delivery') || lower.startsWith('remove delivery') || lower.startsWith('delete task') || lower.startsWith('remove task')) {
-                const targetQuery = text.replace(/delete\s+(?:delivery|task)|remove\s+(?:delivery|task)|for\s+client|for/gi, '').trim();
-                if (!targetQuery) {
-                    return { text: 'Please specify which task or client name to delete.' };
-                }
-
-                // Stage for confirmation
-                return {
-                    text: `⚠️ Are you sure you want to delete the delivery task matching **"${targetQuery}"**?`,
-                    requiresConfirmation: true,
-                    actionPayload: {
-                        type: 'delete_delivery',
-                        query: targetQuery
-                    }
-                };
-            }
-
-            // --- INTENT 4: LIST DELIVERY TASKS ---
-            if (lower.includes('list deliveries') || lower.includes('show deliveries') || lower.includes('active deliveries') || lower.includes('undelivered') || lower.includes('delivery tasks') || lower.includes('what is out for delivery')) {
-                let status = 'all';
-                if (lower.includes('undelivered') || lower.includes('active') || lower.includes('pending') || lower.includes('out for delivery')) {
-                    status = 'Undelivered';
-                } else if (lower.includes('completed') || lower.includes('delivered')) {
-                    status = 'Completed';
-                }
-
-                const res = await ChatbotTools.listDeliveryTasks({ status });
-                if (res.items.length === 0) {
-                    return { text: `📦 No ${status !== 'all' ? status : ''} delivery tasks found in the system.` };
-                }
-
-                let textResp = `📦 **Found ${res.count} Delivery Tasks (${status}):**\n\n`;
-                res.items.slice(0, 6).forEach((item, idx) => {
-                    const stBadge = item.status === 'Completed' ? '✅ Done' : '⏳ LIVE';
-                    textResp += `${idx + 1}. **${item.clientName}** — ${item.category} (${item.quantity} units) | Priority: *${item.priority || 'Med'}* | ${stBadge}\n`;
-                });
-                if (res.items.length > 6) {
-                    textResp += `\n*...and ${res.items.length - 6} more visible on your dashboard table.*`;
-                }
-
-                return {
-                    text: textResp,
-                    cardType: 'task_list',
-                    items: res.items.slice(0, 6)
-                };
-            }
-
-            // --- INTENT 5: WAREHOUSE STOCK STATUS & LOW STOCK ALERTS ---
-            if (lower.includes('warehouse stock') || lower.includes('check stock') || lower.includes('stock status') || lower.includes('low stock') || lower.includes('warehouse status') || lower.includes('inventory status')) {
-                const res = await ChatbotTools.getWarehouseStock();
-                let textResp = `📊 **Warehouse Inventory Status:**\n\n`;
-
-                res.categories.forEach(c => {
-                    const alertDot = c.isLowStock ? '🔴 **LOW**' : '🟢 Good';
-                    textResp += `• **${c.category}**: **${c.stockRemaining} units** available (Min: ${c.minimumStock}) | Delivery: ${c.outForDelivery} | ${alertDot}\n`;
-                });
-
-                if (res.hasLowStock) {
-                    textResp += `\n⚠️ **Low Stock Warning:** ${res.lowStockAlerts.map(a => a.category).join(', ')} require restocking!`;
-                }
-
-                return {
-                    text: textResp,
-                    cardType: 'warehouse_overview',
-                    categories: res.categories
-                };
-            }
-
-            // (Intents 6A, 6B, 6C moved to top of SmartNLP.process for correct routing priority)
-
-            // --- INTENT 7: LOG WORK HOURS (TEAM TRACKER) ---
-            if (lower.startsWith('log ') || lower.includes('log hours') || lower.includes('log work') ||
-                lower.includes('add log') || lower.includes('log task') || lower.includes('hours to ') || lower.includes('hours for ')) {
-
-                let hours = 4;
-                const hoursMatch = text.match(/(\d+(\.\d+)?)\s*(?:hours?|hrs?|h)\b/i);
-                if (hoursMatch) hours = parseFloat(hoursMatch[1]);
-
-                // Member name: capture only the SINGLE word immediately after "for" or "to"
-                // (multi-word greedy match was creating names like "Aalok with task Chemical Formulation")
-                let memberName = 'Unknown';
-                const SKIP_WORDS = new Set(['hours', 'hrs', 'log', 'task', 'production', 'delivery',
-                    'meeting', 'the', 'work', 'add', 'with', 'a', 'an', 'some', 'my', 'his', 'her']);
-
-                // Match exactly one word after "for" or "to"
-                const memMatchPrimary = text.match(/\b(?:for|to)\s+([A-Za-z]+)/i);
-                if (memMatchPrimary) {
-                    const candidate = memMatchPrimary[1].trim();
-                    if (!SKIP_WORDS.has(candidate.toLowerCase())) {
-                        memberName = candidate;
-                    }
-                }
-
-                // Fallback: last valid word not in skip list (case insensitive)
-                if (memberName === 'Unknown') {
-                    const words = text.split(/\s+/);
-                    for (let i = words.length - 1; i >= 0; i--) {
-                        const w = words[i].replace(/[^a-zA-Z]/g, '');
-                        if (w.length > 1 && !SKIP_WORDS.has(w.toLowerCase())) {
-                            memberName = w;
-                            break;
-                        }
-                    }
-                }
-
-
-                let wageCategory = 'production';
-                if (lower.includes('delivery')) wageCategory = 'delivery';
-                else if (lower.includes('meeting') || lower.includes('client meet')) wageCategory = 'meeting';
-                else if (lower.includes('other')) wageCategory = 'others';
-
-                let hasVehicle = lower.includes('vehicle') || lower.includes('bike') || lower.includes('car');
-
-                // --- Task name extraction (priority order) ---
-                let taskName = null;
-
-                // 1. Explicit: "with task <name>" or "task name: <name>"
-                const explicitTaskMatch = text.match(/(?:with\s+task|doing)\s+([a-zA-Z0-9][a-zA-Z0-9\s]{1,50}?)(?:\s+(?:for|to|on|hours?|$)|$)/i);
-                if (explicitTaskMatch) {
-                    taskName = explicitTaskMatch[1].trim();
-                }
-
-                // 2. Inline word between "hours" and "for": "Log 5 hours test for Aalok"
-                //    Captures any non-keyword word(s) sitting between the hours value and "for <name>"
-                if (!taskName) {
-                    const inlineTaskMatch = text.match(/(?:hours?|hrs?)\s+([a-zA-Z][a-zA-Z0-9\s]{0,40}?)\s+(?:for|to)\s+[a-zA-Z]/i);
-                    if (inlineTaskMatch) {
-                        const candidate = inlineTaskMatch[1].trim();
-                        const CATEGORY_WORDS = new Set(['production', 'delivery', 'meeting', 'others', 'other']);
-                        if (candidate && !CATEGORY_WORDS.has(candidate.toLowerCase())) {
-                            taskName = candidate;
-                        }
-                    }
-                }
-
-                // 3. Fallback: use the wage category as the task label
-                if (!taskName) {
-                    taskName = `${wageCategory.charAt(0).toUpperCase() + wageCategory.slice(1)} Task`;
-                }
-
-                const res = await ChatbotTools.logWorkHours({
-                    memberName,
-                    taskName,
-                    hours,
-                    wageCategory,
-                    hasVehicle
-                });
-
-                return {
-                    text: res.message,
-                    cardType: 'work_logged',
-                    cardData: res.log
-                };
-            }
-
-            // --- INTENT 8: WAGES & HOURS REPORT ---
-            if (lower.includes('wages') || lower.includes('salary') || lower.includes('total wages') || lower.includes('wage report')) {
-                let memberName = 'all';
-                const memMatch = text.match(/for\s+([a-zA-Z]+)/i);
-                if (memMatch) memberName = memMatch[1];
-
-                const res = await ChatbotTools.getWagesSummary({ memberName });
-
-                let textResp = `💰 **Wages & Hours Summary${memberName !== 'all' ? ` for ${memberName}` : ''}:**\n\n`;
-                textResp += `• **Total Wages**: ₹${res.totalWages.toFixed(2)}\n`;
-                textResp += `• **Total Hours Logged**: ${res.totalHours.toFixed(1)} hrs\n`;
-                textResp += `• **Total Tasks**: ${res.taskCount}\n\n`;
-                textResp += `**Breakdown by Category:**\n`;
-                textResp += `- Production: ₹${res.productionWages.toFixed(2)}\n`;
-                textResp += `- Delivery: ₹${res.deliveryWages.toFixed(2)}\n`;
-                textResp += `- Client Meetings: ₹${res.meetingWages.toFixed(2)}\n`;
-
-                return { text: textResp };
-            }
-
-            // --- INTENT 9: ADD TEAM MEMBER ---
-            if (lower.startsWith('add team member') || lower.startsWith('add member') || lower.startsWith('new member')) {
-                const clean = text.replace(/add\s+(?:team\s+)?member|new\s+member/gi, '').trim();
-                const parts = clean.split(/\s+(?:as|role)\s+/i);
-                const name = parts[0]?.trim();
-                const role = parts[1]?.trim() || 'Team Member';
-
-                if (!name) return { text: 'Please specify the name of the new member. (e.g. *"Add member Alex as Warehouse Manager"*).' };
-
-                const res = await ChatbotTools.addTeamMember({ name, role });
-                return { text: res.message };
-            }
-
-            // --- INTENT 10: HELP / CAPABILITIES ---
-            if (lower === 'help' || lower.includes('what can you do') || lower.includes('commands') || lower.includes('capabilities')) {
-                const helpText = `🤖 **WorkSync AI Assistant Capabilities (CRUD):**\n\n` +
-                    `📦 **Inventory & Delivery Tasks:**\n` +
-                    `• *"Add 50 Dishwasher for client Stark Corp assigned to Mike priority High"*\n` +
-                    `• *"Show all active delivery tasks"*\n` +
-                    `• *"Mark delivery for Stark Corp as completed"*\n` +
-                    `• *"Delete delivery task for Stark Corp"*\n\n` +
-                    `📊 **Warehouse Stock:**\n` +
-                    `• *"Check warehouse stock status"*\n` +
-                    `• *"Update floor cleaner stock to 150"*\n` +
-                    `• *"Set dishwasher minimum threshold to 20"*\n\n` +
-                    `⏱️ **Team Task Tracker & Wages:**\n` +
-                    `• *"Log 4 hours production for Sarah with task Mixing"*\n` +
-                    `• *"Log delivery for Mike 2 hours with vehicle"*\n` +
-                    `• *"Show total wages report"*\n` +
-                    `• *"Add team member David as Logistics Lead"*`;
-                return { text: helpText };
-            }
-
-            // Fallback for Smart NLP
-            return {
-                text: `I understood you said: *"^${text}"*.\n\nI can perform any CRUD operations on deliveries, warehouse stock, and wages. Type **"help"** or click one of the quick suggestions below!`
-            };
-        }
-    };
-
-    // ==========================================
-    // 4. GEMINI API LLM AGENTIC ENGINE (OPTIONAL)
-    // ==========================================
-    const GeminiLLM = {
-        toolDeclarations: [
-            {
-                name: 'createDeliveryTask',
-                description: 'Creates a new delivery task in the inventory system.',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        category: { type: 'STRING', description: 'Category: Floor Cleaner, Bathroom Cleaner, Dishwasher, Phenyl, Glass Cleaner, Handwash' },
-                        productName: { type: 'STRING', description: 'Fragrance or formula name' },
-                        clientName: { type: 'STRING', description: 'Name of the client receiving delivery' },
-                        quantity: { type: 'NUMBER', description: 'Quantity units delivered' },
-                        assignedDelivery: { type: 'STRING', description: 'Person assigned for delivery' },
-                        priority: { type: 'STRING', enum: ['Low', 'Medium', 'High'], description: 'Task priority' }
-                    },
-                    required: ['category', 'clientName', 'quantity']
-                }
-            },
-            {
-                name: 'listDeliveryTasks',
-                description: 'Lists delivery tasks filtered by status, category, client, or priority.',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        status: { type: 'STRING', enum: ['all', 'Undelivered', 'Completed'] },
-                        category: { type: 'STRING' },
-                        client: { type: 'STRING' }
-                    }
-                }
-            },
-            {
-                name: 'updateDeliveryTask',
-                description: 'Marks a delivery task as completed/delivered or updates its details.',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        query: { type: 'STRING', description: 'Client name or product name to search and update' },
-                        status: { type: 'STRING', enum: ['Completed', 'Undelivered'] },
-                        markDelivered: { type: 'BOOLEAN' }
-                    },
-                    required: ['query']
-                }
-            },
-            {
-                name: 'deleteDeliveryTask',
-                description: 'Deletes a delivery task by client or query.',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        query: { type: 'STRING', description: 'Client or task name to delete' }
-                    },
-                    required: ['query']
-                }
-            },
-            {
-                name: 'getWarehouseStock',
-                description: 'Gets current warehouse inventory levels, thresholds, and low-stock alerts.',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        category: { type: 'STRING', description: 'Optional specific category' }
-                    }
-                }
-            },
-            {
-                name: 'updateWarehouseStock',
-                description: 'Updates a warehouse stock metric (stockRemaining, minimumStock, rawMaterialsInInventory, etc.).',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        category: { type: 'STRING', description: 'Product category' },
-                        field: { type: 'STRING', enum: ['stockRemaining', 'minimumStock', 'rawMaterialsInInventory', 'rawMaterialsOrdered', 'productionRatePerDay'] },
-                        value: { type: 'NUMBER', description: 'New numerical value' }
-                    },
-                    required: ['category', 'field', 'value']
-                }
-            },
-            {
-                name: 'logWorkHours',
-                description: 'Logs work hours and task for a team member into Team Performance Hub with automated wage formula calculation.',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        memberName: { type: 'STRING', description: 'Name of the team member' },
-                        taskName: { type: 'STRING', description: 'Task description' },
-                        hours: { type: 'NUMBER', description: 'Number of hours worked' },
-                        wageCategory: { type: 'STRING', enum: ['production', 'delivery', 'meeting', 'others'] },
-                        hasVehicle: { type: 'BOOLEAN', description: 'Whether personal vehicle was used (for delivery)' }
-                    },
-                    required: ['memberName', 'hours', 'wageCategory']
-                }
-            },
-            {
-                name: 'getWagesSummary',
-                description: 'Retrieves wage calculations, total hours, and category breakdown for team members.',
-                parameters: {
-                    type: 'OBJECT',
-                    properties: {
-                        memberName: { type: 'STRING', description: 'Optional member name or "all"' }
-                    }
-                }
-            }
-        ],
+            return [];
+        },
 
         async process(userInput) {
-            if (!state.apiKey) {
-                return { text: '🔑 Please configure your Gemini API Key in the Chatbot settings, or switch back to the Built-in Smart NLP Engine.' };
+            const trimmed = (userInput || '').trim();
+
+            // Command to set or update API key directly from chat: e.g. /apikey AIzaSy...
+            if (trimmed.startsWith('/apikey') || trimmed.toLowerCase().startsWith('set apikey')) {
+                const parts = trimmed.split(/\s+/);
+                if (parts.length >= 2 && parts[1]) {
+                    localStorage.setItem('worksync_gemini_api_key', parts[1].trim());
+                    return { text: '✅ Gemini API Key saved successfully! You can now log work hours freely.' };
+                }
+                return { text: 'ℹ️ Usage: Type `/apikey YOUR_KEY_HERE` to set your Gemini API key.' };
             }
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${state.apiKey}`;
+            const apiKey = this.getApiKey();
+            if (!apiKey) {
+                return {
+                    text: '⚠️ Gemini API Key not configured. Please type `/apikey YOUR_GEMINI_KEY` (Free from aistudio.google.com) or configure it in script.js.'
+                };
+            }
 
-            const systemInstruction = {
-                role: 'user',
-                parts: [{
-                    text: 'You are the WorkSync Enterprise AI Assistant. You help warehouse managers manage inventory, create/update/delete delivery tasks, monitor warehouse stock, and log work hours with wages. Always use the available tools when asked to create, read, update, or delete data.'
-                }]
-            };
+            const registeredMembers = await this.getRegisteredMembers();
+            const memberConstraint = registeredMembers.length > 0
+                ? `CRITICAL MEMBER RULE: The ONLY existing registered team members are: [${registeredMembers.join(', ')}]. You MUST match any employee names in the user's message to one of these exact registered names. If an employee mentioned is NOT in this list, return null for name.`
+                : `Extract and clean the employee name matching the registered team members.`;
+
+            const systemInstruction = `You are a precise data extraction engine for a payroll and inventory dashboard. 
+Analyze the incoming text log, completely ignoring word patterns, spelling mistakes, or case variations.
+${memberConstraint}
+Extract and map the variables into a JSON array of log objects (or a single JSON object):
+[
+  {
+    "name": "Exact matching name from the registered team members list",
+    "hours": number value (convert words like 'one', 'two' into digit format),
+    "task": "short category or description matching the task (e.g. Delivery, Dishwash Production, Packaging)",
+    "category": "strictly classify as one of: 'delivery' (for all delivery/dispatch/dropping orders, even if misspelled 'delievery'), 'production' (for manufacturing, making cleaner/dishwash, batch, bottles), 'meeting' (client visits, meetings), or 'others'",
+    "produced": "summary of the deliverable or output created (or null if not mentioned)"
+  }
+]
+Note: If multiple employees are mentioned in the message (e.g. 'aalok and jay'), return an array containing an entry for EACH employee with their respective hours and task.
+If a critical value is missing (such as name or hours), return null for that property. Return raw JSON only. Do not include markdown wraps or code blocks.`;
+
+            const promptText = `${systemInstruction}\n\nIMPORTANT: Respond with pure JSON only (no markdown, no backticks, no explanatory text).\n\nUser input to parse:\n"${trimmed}"`;
 
             const payload = {
                 contents: [
-                    systemInstruction,
-                    { role: 'user', parts: [{ text: userInput }] }
-                ],
-                tools: [{ functionDeclarations: this.toolDeclarations }]
+                    {
+                        parts: [{ text: promptText }]
+                    }
+                ]
             };
 
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+            // Dynamically discover active models enabled on this specific key
+            let candidateModels = await this.fetchSupportedModels(apiKey);
+            if (!candidateModels || candidateModels.length === 0) {
+                candidateModels = [
+                    'gemini-1.5-flash-latest',
+                    'gemini-1.5-flash',
+                    'gemini-2.0-flash-exp',
+                    'gemini-3.8-flash'
+                ];
+            }
 
-                if (!response.ok) {
-                    const errText = await response.text();
-                    console.error('Gemini API Error:', errText);
-                    return { text: `Gemini API returned error (${response.status}). Falling back to local engine:\n\n` + (await SmartNLP.process(userInput)).text };
-                }
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+            let lastError = null;
 
-                const result = await response.json();
-                const candidate = result.candidates?.[0];
-                if (!candidate) return { text: 'No response from Gemini.' };
+            for (const model of candidateModels) {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-                const part = candidate.content?.parts?.[0];
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
 
-                // If model requested tool calls
-                if (part?.functionCall) {
-                    const call = part.functionCall;
-                    const toolName = call.name;
-                    const args = call.args || {};
+                        const data = await response.json();
 
-                    if (typeof ChatbotTools[toolName] === 'function') {
-                        const toolResult = await ChatbotTools[toolName](args);
-                        return {
-                            text: toolResult.message || `Executed ${toolName} successfully.`,
-                            toolCall: { name: toolName, args, result: toolResult }
-                        };
+                        if (!response.ok) {
+                            const errMsg = data.error?.message || response.statusText;
+                            lastError = { status: response.status, message: errMsg };
+
+                            if (response.status === 403 || errMsg.includes('disabled') || errMsg.includes('PERMISSION_DENIED')) {
+                                return { 
+                                    text: `⚠️ **Gemini API Key Permission:**<br>Your key is not permitted for Generative Language API.<br>1. Create a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--primary-color);text-decoration:underline;">Google AI Studio</a>.<br>2. Type in chat: <code>/apikey YOUR_KEY</code>` 
+                                };
+                            }
+                            if (response.status === 400 && errMsg.includes('API key')) {
+                                return { text: `⚠️ Invalid API Key. Please update it by typing: \`/apikey YOUR_GEMINI_API_KEY\`` };
+                            }
+
+                            // If 503 or 429, wait 600ms and try once more or fallback to next model
+                            if (response.status === 503 || response.status === 429) {
+                                if (attempt === 0) {
+                                    await sleep(600);
+                                    continue;
+                                }
+                            }
+                            break; // Try next model
+                        }
+
+                        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (!rawText) break;
+
+                        let extracted;
+                        try {
+                            let clean = rawText.trim();
+                            clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+                            const bStart = clean.indexOf('[');
+                            const oStart = clean.indexOf('{');
+                            if (bStart !== -1 && (oStart === -1 || bStart < oStart)) {
+                                const bEnd = clean.lastIndexOf(']');
+                                if (bEnd !== -1) clean = clean.substring(bStart, bEnd + 1);
+                            } else if (oStart !== -1) {
+                                const oEnd = clean.lastIndexOf('}');
+                                if (oEnd !== -1) clean = clean.substring(oStart, oEnd + 1);
+                            }
+                            extracted = JSON.parse(clean);
+                        } catch (parseErr) {
+                            console.error('JSON Parse Error on text:', rawText, parseErr);
+                            return { text: `⚠️ Could not parse structured data: ${rawText}` };
+                        }
+
+                        // Normalize to array
+                        const items = Array.isArray(extracted) ? extracted : [extracted];
+                        const validLogs = items.filter(it => it && it.name && it.hours && it.task);
+
+                        if (validLogs.length === 0) {
+                            return {
+                                text: '⚠️ Missing details: Please ensure your message includes an existing employee name, number of hours, and the task performed.',
+                                cardType: 'work_logged',
+                                cardData: items[0] || null
+                            };
+                        }
+
+                        // Strictly verify against existing registered members only
+                        const verifiedLogs = [];
+                        const unregisteredNames = [];
+
+                        for (const item of validLogs) {
+                            let matchedName = null;
+                            if (registeredMembers.length > 0) {
+                                const found = registeredMembers.find(m => m.trim().toLowerCase() === String(item.name).trim().toLowerCase());
+                                if (found) {
+                                    matchedName = found; // Use the exact registered casing
+                                } else {
+                                    unregisteredNames.push(item.name);
+                                }
+                            } else {
+                                matchedName = String(item.name).trim();
+                            }
+
+                            if (matchedName) {
+                                verifiedLogs.push({ ...item, name: matchedName });
+                            }
+                        }
+
+                        if (verifiedLogs.length === 0 && unregisteredNames.length > 0) {
+                            return {
+                                text: `⚠️ **Member Not Found:** "${unregisteredNames.join(', ')}" is not in your registered team list.<br>Existing members: **${registeredMembers.join(', ')}**.<br>*(The bot only logs hours for existing members).*`
+                            };
+                        }
+
+                        // Save each verified log to Firestore
+                        const savedLogs = [];
+                        for (const item of verifiedLogs) {
+                            const logEntry = {
+                                name: item.name,
+                                hours: Number(item.hours),
+                                task: String(item.task).trim(),
+                                produced: item.produced ? String(item.produced).trim() : 'N/A',
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                                dateString: new Date().toISOString()
+                            };
+
+                            if (typeof db !== 'undefined') {
+                                // 1. Write to hours_logs for bi-monthly salary tracker
+                                await db.collection('hours_logs').add(logEntry);
+
+                                // 2. Write to tracker_tasks for main Team Performance table
+                                const catRaw = (item.category || '').toLowerCase().trim();
+                                const taskCombined = ((logEntry.task || '') + ' ' + (item.category || '') + ' ' + trimmed).toLowerCase();
+
+                                let wageCategory = 'others';
+                                let calculatedCost = logEntry.hours * 25; // default fallback
+
+                                if (catRaw === 'delivery' || /(?:delie?ve?r|deliv|delv|dispatch|drop|transport|shipping)/i.test(taskCombined)) {
+                                    wageCategory = 'delivery';
+                                    calculatedCost = 150; // standard delivery with vehicle
+                                } else if (catRaw === 'production' || /(?:prod|make|making|batch|dishwash|cleaner|pack|bottle|manufactur)/i.test(taskCombined)) {
+                                    wageCategory = 'production';
+                                    calculatedCost = logEntry.hours <= 4 ? 100 : 200;
+                                } else if (catRaw === 'meeting' || /(?:meet|client|visit|consult)/i.test(taskCombined)) {
+                                    wageCategory = 'meeting';
+                                    calculatedCost = 100;
+                                }
+
+                                const now = new Date();
+                                const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                                const gridDateStr = `${daysOfWeek[now.getDay()]} ${now.getDate()}`;
+                                const todayStr = now.toISOString().split('T')[0];
+
+                                const trackerTaskDoc = {
+                                    memberName: logEntry.name,
+                                    dateStr: gridDateStr,
+                                    isoDate: todayStr,
+                                    name: logEntry.task,
+                                    wageCategory: wageCategory,
+                                    hours: logEntry.hours,
+                                    hasVehicle: wageCategory === 'delivery',
+                                    commissionAmount: 0,
+                                    calculatedCost: calculatedCost,
+                                    status: 'Completed',
+                                    paymentStatus: 'pending',
+                                    createdAt: Date.now(),
+                                    updatedAt: Date.now()
+                                };
+
+                                logEntry.wageCategory = wageCategory;
+                                logEntry.calculatedCost = calculatedCost;
+
+                                await db.collection('tracker_tasks').add(trackerTaskDoc);
+                                // Note: We NEVER add to tracker_members here! Existing members only.
+                            }
+                            savedLogs.push(logEntry);
+                        }
+
+                        if (savedLogs.length === 1) {
+                            const l = savedLogs[0];
+                            return {
+                                text: `✅ Successfully logged ${l.hours}h for **${l.name}** on task: "${l.task}".`,
+                                cardType: 'work_logged',
+                                cardData: l
+                            };
+                        } else {
+                            const names = savedLogs.map(l => `${l.name} (${l.hours}h)`).join(', ');
+                            return {
+                                text: `✅ Successfully logged hours for **${savedLogs.length} team members**: ${names}.`,
+                                cardType: 'work_logged',
+                                cardData: savedLogs[0]
+                            };
+                        }
+
+                    } catch (fetchErr) {
+                        console.warn(`Error contacting endpoint:`, fetchErr);
+                        lastError = { status: 0, message: fetchErr.message };
+                        break;
                     }
                 }
-
-                return { text: part?.text || 'Operation completed.' };
-            } catch (e) {
-                console.error('Gemini Exception:', e);
-                return { text: `Error connecting to Gemini: ${e.message}. Using Smart NLP fallback:\n\n` + (await SmartNLP.process(userInput)).text };
             }
+
+            return {
+                text: `⚠️ All Gemini free models are currently under heavy load (${lastError?.message || '503'}). Please retry in a moment.`
+            };
+
+        },
+
+        initRealtimeDashboard() {
+            const period1Dashboard = document.getElementById("period1-salary");
+            const period2Dashboard = document.getElementById("period2-salary");
+            const CURRENCY_MULTIPLIER = 25; // ₹25 per hour standard multiplier
+
+            if (typeof db === 'undefined') return;
+
+            db.collection("hours_logs").orderBy("timestamp", "asc").onSnapshot((snapshot) => {
+                let period1Total = 0;
+                let period2Total = 0;
+
+                snapshot.forEach((doc) => {
+                    const log = doc.data();
+                    if (log.hours) {
+                        const logDate = log.timestamp && typeof log.timestamp.toDate === 'function' 
+                            ? log.timestamp.toDate() 
+                            : new Date(log.dateString || Date.now());
+                        const dateDay = logDate.getDate();
+                        const accruedSalary = Number(log.hours) * CURRENCY_MULTIPLIER;
+
+                        if (dateDay >= 1 && dateDay <= 15) {
+                            period1Total += accruedSalary;
+                        } else {
+                            period2Total += accruedSalary;
+                        }
+                    }
+                });
+
+                if (period1Dashboard) {
+                    period1Dashboard.textContent = `₹${period1Total.toFixed(2)}`;
+                }
+                if (period2Dashboard) {
+                    period2Dashboard.textContent = `₹${period2Total.toFixed(2)}`;
+                }
+            }, (error) => {
+                console.warn('Hours logs snapshot listener notice:', error);
+            });
         }
     };
 
@@ -1188,6 +990,8 @@
             this.injectHTML();
             this.bindEvents();
             this.renderWelcome();
+            // Start dashboard listener
+            GeminiCloudFunction.initRealtimeDashboard();
         },
 
         injectHTML() {
@@ -1226,13 +1030,11 @@
                                 WorkSync AI
                                 <span class="chatbot-status-pill"><span class="chatbot-status-dot"></span>Online</span>
                             </div>
-                            <div class="chatbot-subtitle" id="chatbotEngineLabel">Smart NLU • CRUD Ready</div>
+                            <div class="chatbot-subtitle">AI Assistant • Agentic Mode</div>
                         </div>
                     </div>
                     <div class="chatbot-header-actions">
-                        <button id="chatbotSettingsBtn" class="chatbot-header-btn" title="Model & API Settings">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                        </button>
+                        
                         <button id="chatbotClearBtn" class="chatbot-header-btn" title="Clear Chat History">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                         </button>
@@ -1245,15 +1047,6 @@
                 <!-- Messages Body -->
                 <div id="chatbotMessages" class="chatbot-messages"></div>
 
-                <!-- Quick Action Chips -->
-                <div id="chatbotChips" class="chatbot-chips-container">
-                    <button class="chatbot-chip" data-query="Check warehouse stock status">📊 Stock Status</button>
-                    <button class="chatbot-chip" data-query="Show active delivery tasks">📦 Deliveries</button>
-                    <button class="chatbot-chip" data-query="Add 20 Dishwasher for client Stark Corp priority High">➕ Add Delivery</button>
-                    <button class="chatbot-chip" data-query="Show wages report">💰 Wages Report</button>
-                    <button class="chatbot-chip" data-query="Help">❓ Help</button>
-                </div>
-
                 <!-- Input Footer -->
                 <form id="chatbotForm" class="chatbot-input-form">
                     <input type="text" id="chatbotInput" class="chatbot-input" placeholder="Ask AI to add tasks, update stock, check wages..." autocomplete="off">
@@ -1264,35 +1057,6 @@
                         </svg>
                     </button>
                 </form>
-            </div>
-
-            <!-- Chatbot Settings Modal -->
-            <div id="chatbotSettingsModal" class="modal" style="display:none;">
-                <div class="modal-content" style="max-width: 480px;">
-                    <span class="close-btn" id="closeChatbotSettingsModal">&times;</span>
-                    <h2>AI Assistant Settings</h2>
-                    <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem;">
-                        WorkSync AI features a zero-setup <b>Smart Built-in NLP Engine</b> and an optional <b>Google Gemini LLM Engine</b> for complex natural conversation.
-                    </p>
-                    <form id="chatbotSettingsForm">
-                        <div class="form-group">
-                            <label for="aiEngineSelect">Execution Engine</label>
-                            <select id="aiEngineSelect" style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:0.95rem;">
-                                <option value="smart_nlp">⚡ Built-in Smart NLP Engine (Instant, Offline, No Keys)</option>
-                                <option value="gemini_llm">✨ Google Gemini LLM (Full Conversational Agent)</option>
-                            </select>
-                        </div>
-                        <div class="form-group" id="geminiKeyGroup" style="display:none;">
-                            <label for="geminiApiKeyInput">Google Gemini API Key</label>
-                            <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy..." style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:0.95rem;">
-                            <small style="color:var(--text-secondary);display:block;margin-top:0.35rem;">Your API key is securely saved locally in your browser storage.</small>
-                        </div>
-                        <div style="display:flex;gap:1rem;margin-top:1.5rem;">
-                            <button type="submit" class="btn-primary" style="flex:1;">Save Settings</button>
-                            <button type="button" class="btn-secondary" id="cancelChatbotSettingsBtn" style="flex:1;">Cancel</button>
-                        </div>
-                    </form>
-                </div>
             </div>
             `;
 
@@ -1341,29 +1105,6 @@
                 if (settingsModal) settingsModal.style.display = 'flex';
             });
 
-            engineSelect?.addEventListener('change', (e) => {
-                if (keyGroup) keyGroup.style.display = e.target.value === 'gemini_llm' ? 'block' : 'none';
-            });
-
-            closeSettingsBtn?.addEventListener('click', () => { if (settingsModal) settingsModal.style.display = 'none'; });
-            cancelSettingsBtn?.addEventListener('click', () => { if (settingsModal) settingsModal.style.display = 'none'; });
-
-            settingsForm?.addEventListener('submit', (e) => {
-                e.preventDefault();
-                state.engine = engineSelect.value;
-                state.apiKey = keyInput.value.trim();
-                localStorage.setItem(CHATBOT_CONFIG.storageKeyEngine, state.engine);
-                localStorage.setItem(CHATBOT_CONFIG.storageKeyApiKey, state.apiKey);
-
-                const engineLabel = document.getElementById('chatbotEngineLabel');
-                if (engineLabel) {
-                    engineLabel.textContent = state.engine === 'gemini_llm' ? 'Gemini LLM • Agentic Mode' : 'Smart NLU • CRUD Ready';
-                }
-
-                if (settingsModal) settingsModal.style.display = 'none';
-                this.addMessage('assistant', `⚙️ Engine updated to **${state.engine === 'gemini_llm' ? 'Google Gemini LLM' : 'Built-in Smart NLP'}**.`);
-            });
-
             // Quick suggestion chips
             chips?.addEventListener('click', (e) => {
                 const btn = e.target.closest('.chatbot-chip');
@@ -1382,32 +1123,12 @@
                 input.value = '';
                 this.addMessage('user', query);
 
-                // Process pending confirmation if answering yes/no
-                if (state.pendingAction) {
-                    const lowerQ = query.toLowerCase();
-                    if (lowerQ === 'yes' || lowerQ === 'confirm' || lowerQ === 'y' || lowerQ === 'ok') {
-                        const payload = state.pendingAction;
-                        state.pendingAction = null;
-                        await this.executeConfirmedAction(payload);
-                        return;
-                    } else if (lowerQ === 'no' || lowerQ === 'cancel' || lowerQ === 'n') {
-                        state.pendingAction = null;
-                        this.addMessage('assistant', 'Action cancelled.');
-                        return;
-                    }
-                }
-
                 // Normal execution
                 state.isBusy = true;
                 this.showTypingIndicator();
 
                 try {
-                    let response;
-                    if (state.engine === 'gemini_llm' && state.apiKey) {
-                        response = await GeminiLLM.process(query);
-                    } else {
-                        response = await SmartNLP.process(query);
-                    }
+                    const response = await GeminiCloudFunction.process(query);
 
                     this.hideTypingIndicator();
 
@@ -1447,7 +1168,7 @@
 
         renderWelcome() {
             const user = getCurrentUser();
-            const welcomeText = `👋 Hello **${user}**! I am your **WorkSync AI Assistant**.\n\nI can execute live **CRUD operations** directly on your database:\n• Create and assign delivery tasks\n• Check and adjust warehouse stock & thresholds\n• Log work hours & calculate wages\n• Query active tasks and team stats\n\nHow can I help you today?`;
+            const welcomeText = `Hello admin how may i assist u`;
             this.addMessage('assistant', welcomeText);
         },
 
@@ -1478,12 +1199,14 @@
                 `;
             } else if (extra.cardType === 'work_logged' && extra.cardData) {
                 const l = extra.cardData;
+                const catLabel = l.wageCategory ? l.wageCategory.toUpperCase() : 'HOURS LOGGED';
+                const wageLabel = l.calculatedCost ? ` • ₹${l.calculatedCost}` : '';
                 extraHtml = `
                     <div class="chatbot-result-card">
-                        <div class="card-badge" style="background:rgba(245,158,11,0.2);color:#f59e0b;">Hours Logged</div>
-                        <div style="font-weight:700;font-size:0.95rem;color:var(--primary-color);">${l.memberName} — ${l.hours}h</div>
-                        <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:2px;">Task: ${l.name} (${l.wageCategory})</div>
-                        <div style="font-size:0.85rem;font-weight:600;color:var(--accent-color);margin-top:4px;">Calculated Wage: ₹${l.calculatedCost}</div>
+                        <div class="card-badge" style="background:rgba(245,158,11,0.2);color:#f59e0b;">${catLabel}${wageLabel}</div>
+                        <div style="font-weight:700;font-size:0.95rem;color:var(--primary-color);">${l.name} — ${l.hours}h</div>
+                        <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:2px;">Task: ${l.task}</div>
+                        <div style="font-size:0.85rem;font-weight:600;color:var(--accent-color);margin-top:4px;">Output: ${l.produced}</div>
                     </div>
                 `;
             }
@@ -1605,9 +1328,6 @@
     // Expose global access for debug / extensions
     window.WorkSyncChatbot = {
         tools: ChatbotTools,
-        nlp: SmartNLP,
-        llm: GeminiLLM,
-        ui: ChatbotUI,
         open: () => ChatbotUI.toggleChat(true),
         close: () => ChatbotUI.toggleChat(false),
     };

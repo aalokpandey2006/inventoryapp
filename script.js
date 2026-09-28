@@ -1501,7 +1501,28 @@ document.addEventListener('DOMContentLoaded', () => {
             // Cells in front of names (columns)
             trackerMembers.forEach(member => {
                 const td = document.createElement('td');
-                const matchingTasks = trackerTasks.filter(t => t.memberName === member.name && t.dateStr === date.dateStr);
+                const matchingTasks = trackerTasks.filter(t => {
+                    const memberMatches = (t.memberName || '').trim().toLowerCase() === (member.name || '').trim().toLowerCase();
+                    if (!memberMatches) return false;
+
+                    const tDate = (t.dateStr || '').trim().toLowerCase();
+                    const gDate = (date.dateStr || '').trim().toLowerCase();
+                    if (tDate === gDate) return true;
+
+                    // Match ISO dates e.g. "2026-09-29" against "tue 29"
+                    if (tDate.includes('-')) {
+                        const parts = tDate.split('T')[0].split('-');
+                        if (parts.length === 3) {
+                            const yr = parseInt(parts[0], 10);
+                            const mo = parseInt(parts[1], 10) - 1;
+                            const da = parseInt(parts[2], 10);
+                            const d = new Date(yr, mo, da);
+                            const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                            if (`${days[d.getDay()]} ${da}` === gDate) return true;
+                        }
+                    }
+                    return false;
+                });
 
                 let cellContentHtml = '<div style="display: flex; flex-direction: column; gap: 4px; height: 100%; min-height: 40px;">';
                 if (matchingTasks.length > 0) {

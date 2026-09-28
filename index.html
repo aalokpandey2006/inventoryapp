@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,13 +8,14 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="worksync-theme.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
 
-    
+
+
     <!-- Firebase Compat SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
+
 <body>
 
     <!-- ===========================
@@ -28,7 +30,8 @@
             <div>
                 <div class="sidebar-header">
                     <span class="sidebar-logo">Inventory</span>
-                    <button id="sidebarCollapseBtn" class="sidebar-collapse-btn" aria-label="Collapse sidebar" title="Collapse sidebar">&#8249;</button>
+                    <button id="sidebarCollapseBtn" class="sidebar-collapse-btn" aria-label="Collapse sidebar"
+                        title="Collapse sidebar">&#8249;</button>
                 </div>
                 <ul class="sidebar-nav">
                     <li class="nav-item active" data-section="delivery" id="nav-delivery">
@@ -53,7 +56,8 @@
             </div>
             <div class="sidebar-footer">
                 <p>Logged in as</p>
-                <span id="sidebarUser" class="sidebar-user" style="color: var(--text-primary); font-weight: 600;"></span>
+                <span id="sidebarUser" class="sidebar-user"
+                    style="color: var(--text-primary); font-weight: 600;"></span>
             </div>
         </nav>
 
@@ -71,7 +75,9 @@
 
                     <!-- Notification Area -->
                     <div class="notif-bell-wrap">
-                        <button id="notifBellBtn" class="notif-bell-btn" onclick="toggleNotifPanel()" aria-label="Notifications" style="background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 0.9rem;">
+                        <button id="notifBellBtn" class="notif-bell-btn" onclick="toggleNotifPanel()"
+                            aria-label="Notifications"
+                            style="background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 0.9rem;">
                             Alerts
                             <span id="notifBadge" class="notif-badge" style="display:none;">0</span>
                         </button>
@@ -103,10 +109,13 @@
                 </div>
 
                 <main>
-                    <div class="controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <div class="metric-box" style="margin-bottom: 0; display: flex; flex-direction: column; align-items: flex-start; padding: 0.5rem 1rem;">
+                    <div class="controls"
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div class="metric-box"
+                            style="margin-bottom: 0; display: flex; flex-direction: column; align-items: flex-start; padding: 0.5rem 1rem;">
                             <div class="metric-label">Dishwasher - Out for Delivery</div>
-                            <div class="metric-value" id="dishwashDeliveryQty" style="font-size: 1.25rem; color: var(--primary-color);">0</div>
+                            <div class="metric-value" id="dishwashDeliveryQty"
+                                style="font-size: 1.25rem; color: var(--primary-color);">0</div>
                         </div>
                         <button id="addRowBtn" class="btn-primary">+ Add New Task</button>
                     </div>
@@ -140,7 +149,8 @@
                 <div class="warehouse-header">
                     <div>
                         <h2 class="warehouse-title">Warehouse Management</h2>
-                        <p class="warehouse-subtitle">Track stock levels, raw materials &amp; delivery pipeline per category.</p>
+                        <p class="warehouse-subtitle">Track stock levels, raw materials &amp; delivery pipeline per
+                            category.</p>
                     </div>
                     <button id="notifSettingsBtn" class="btn-notif">Alert Settings</button>
                 </div>
@@ -158,7 +168,8 @@
                 <div class="warehouse-header">
                     <div>
                         <h2 class="warehouse-title" id="admin-section-title">Admin Panel</h2>
-                        <p class="warehouse-subtitle" id="admin-section-subtitle">Manage system users, adjust access roles, and route notifications.</p>
+                        <p class="warehouse-subtitle" id="admin-section-subtitle">Manage system users, adjust access
+                            roles, and route notifications.</p>
                     </div>
                 </div>
 
@@ -186,13 +197,16 @@
                 <div class="warehouse-header">
                     <div>
                         <h2 class="warehouse-title">Design System</h2>
-                        <p class="warehouse-subtitle">Edit the configuration of the WorkSync Enterprise design system.</p>
+                        <p class="warehouse-subtitle">Edit the configuration of the WorkSync Enterprise design system.
+                        </p>
                     </div>
                 </div>
 
                 <div class="table-container" style="padding: 1.5rem;">
-                    <textarea id="designEditor" style="width: 100%; height: 400px; padding: 1rem; font-family: monospace; font-size: 14px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; outline: none;"></textarea>
-                    <button id="saveDesignBtn" class="btn-primary" style="margin-top: 1rem;">Save Design Settings</button>
+                    <textarea id="designEditor"
+                        style="width: 100%; height: 400px; padding: 1rem; font-family: monospace; font-size: 14px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; outline: none;"></textarea>
+                    <button id="saveDesignBtn" class="btn-primary" style="margin-top: 1rem;">Save Design
+                        Settings</button>
                 </div>
             </section>
 
@@ -200,12 +214,13 @@
                  TASK TRACKER SECTION (New Calendar Hub)
                  =========================== -->
             <section id="tasks-section" class="page-section">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <div
+                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                     <div>
                         <h2 class="warehouse-title">Team Performance Hub</h2>
                         <p class="warehouse-subtitle">Work cycles and task velocity for Project Alpha</p>
                     </div>
-                    
+
                     <div style="display: flex; gap: 1rem;">
                         <div class="metric-box">
                             <div class="metric-label">Total Hours</div>
@@ -213,13 +228,16 @@
                         </div>
                         <div class="metric-box">
                             <div class="metric-label">Total Wages (Rs)</div>
-                            <div class="metric-value" id="trackerTotalWages" style="color: var(--primary-color);">0</div>
+                            <div class="metric-value" id="trackerTotalWages" style="color: var(--primary-color);">0
+                            </div>
                         </div>
                         <div class="metric-box">
                             <div class="metric-label">Tasks Done</div>
                             <div class="metric-value" id="trackerTasksDone">0</div>
                         </div>
-                        <button class="btn-primary" id="trackerLogHoursBtn" style="padding: 0.5rem 1rem; font-weight: 600; font-size: 0.85rem; border-radius: 6px;">Log New Hours</button>
+                        <button class="btn-primary" id="trackerLogHoursBtn"
+                            style="padding: 0.5rem 1rem; font-weight: 600; font-size: 0.85rem; border-radius: 6px;">Log
+                            New Hours</button>
                     </div>
                 </div>
 
@@ -227,7 +245,9 @@
                 <div class="grid-controls-row">
                     <div class="grid-navigation">
                         <button class="btn-stepper" id="prevMonthBtn" title="Previous Month">&#8592;</button>
-                        <span class="date-range-label" id="dateRangeLabel" style="font-weight: 700; font-size: 0.95rem; color: var(--primary-color); min-width: 120px; text-align: center;">July 2026</span>
+                        <span class="date-range-label" id="dateRangeLabel"
+                            style="font-weight: 700; font-size: 0.95rem; color: var(--primary-color); min-width: 120px; text-align: center;">July
+                            2026</span>
                         <button class="btn-stepper" id="nextMonthBtn" title="Next Month">&#8594;</button>
                         <button class="btn-today" id="currentMonthBtn" title="Go to today's month">Today</button>
                     </div>
@@ -291,7 +311,8 @@
 
                 <!-- Workload Comparison Section -->
                 <div class="comparison-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 class="comparison-title" style="margin-bottom: 0;">Team Workload Comparison</h3>
                         <select class="select-filter" id="comparisonPeriodFilter" style="min-width: 150px;">
                             <!-- Populated dynamically by JS -->
@@ -331,11 +352,13 @@
                 <div class="warehouse-header">
                     <div>
                         <h2 class="warehouse-title">Wages Dashboard</h2>
-                        <p class="warehouse-subtitle">Track and filter calculated wages per person as per system formulas.</p>
+                        <p class="warehouse-subtitle">Track and filter calculated wages per person as per system
+                            formulas.</p>
                     </div>
                 </div>
-                               <div class="tracker-dashboard">
-                    <div class="dashboard-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem;">
+                <div class="tracker-dashboard">
+                    <div class="dashboard-controls"
+                        style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem;">
                         <div class="filter-group">
                             <span class="filter-label">Period:</span>
                             <select id="wagesPeriodFilter" class="select-filter">
@@ -343,37 +366,34 @@
                             </select>
                         </div>
                     </div>
-                    
-                    <div class="metric-cards" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+
+                    <div class="metric-cards"
+                        style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                         <div class="metric-box">
                             <div class="metric-label">Total Wages</div>
-                            <div class="metric-value" id="wagesTotalDisplay" style="color:var(--primary-color);">₹0</div>
+                            <div class="metric-value" id="wagesTotalDisplay" style="color:var(--primary-color);">₹0
+                            </div>
                         </div>
                         <div class="metric-box">
-                            <div class="metric-label">Tasks Completed</div>
-                            <div class="metric-value" id="wagesTasksDisplay" style="color:var(--text-primary);">0</div>
+                            <div class="metric-label">1st - 15th Salary</div>
+                            <div class="metric-value" id="period1-salary" style="color:var(--accent-color);">₹0
+                            </div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">16th - End Salary</div>
+                            <div class="metric-value" id="period2-salary" style="color:var(--accent-color);">₹0
+                            </div>
                         </div>
                         <div class="metric-box">
                             <div class="metric-label">Hours Logged</div>
                             <div class="metric-value" id="wagesHoursDisplay" style="color:var(--text-primary);">0h</div>
                         </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Production</div>
-                            <div class="metric-value" id="wagesProductionDisplay" style="color:var(--accent-color);">₹0</div>
-                        </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Delivery</div>
-                            <div class="metric-value" id="wagesDeliveryDisplay" style="color:var(--accent-color);">₹0</div>
-                        </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Meeting / Other</div>
-                            <div class="metric-value" id="wagesMeetingDisplay" style="color:var(--accent-color);">₹0</div>
-                        </div>
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
                         <div>
-                            <h3 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1.1rem;">Summary by Member</h3>
+                            <h3 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1.1rem;">Summary by
+                                Member</h3>
                             <div class="table-container">
                                 <table id="wagesTable">
                                     <thead>
@@ -391,8 +411,10 @@
                         </div>
 
                         <div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <h3 style="color: var(--text-primary); font-size: 1.1rem; margin: 0;">Detailed Wage Log</h3>
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3 style="color: var(--text-primary); font-size: 1.1rem; margin: 0;">Detailed Wage Log
+                                </h3>
                                 <div class="filter-group">
                                     <span class="filter-label">Member:</span>
                                     <select id="wagesMemberFilter" class="select-filter">
@@ -451,7 +473,7 @@
                     <label for="taskName">Task Name</label>
                     <input type="text" id="taskName" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="wageCategory">Task Category</label>
                     <select id="wageCategory" required onchange="toggleWageFields()">
@@ -482,7 +504,8 @@
                 <div id="deliveryFields" style="display: none;">
                     <div class="form-group">
                         <label class="toggle-label" style="display: flex; align-items: center; gap: 0.5rem;">
-                            <input type="checkbox" id="hasVehicle" style="width:auto;cursor:pointer;accent-color:var(--accent-color);">
+                            <input type="checkbox" id="hasVehicle"
+                                style="width:auto;cursor:pointer;accent-color:var(--accent-color);">
                             <span>Used Personal Vehicle for Delivery?</span>
                         </label>
                     </div>
@@ -492,7 +515,8 @@
                     <div class="form-group">
                         <label for="commissionAmount">Expected Commission (Rs)</label>
                         <input type="number" id="commissionAmount" step="1" min="0" placeholder="0">
-                        <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">Commission is pending next update.</small>
+                        <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">Commission is
+                            pending next update.</small>
                     </div>
                 </div>
 
@@ -502,7 +526,8 @@
                 </script>
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                     <button type="submit" class="btn-modal-submit" style="flex: 2;">Save Log Entry</button>
-                    <button type="button" class="btn-danger" id="deleteTaskBtn" style="flex: 1; display: none; padding: 0.6rem; font-weight: 600; font-size: 0.85rem; border-radius: 4px;">Delete</button>
+                    <button type="button" class="btn-danger" id="deleteTaskBtn"
+                        style="flex: 1; display: none; padding: 0.6rem; font-weight: 600; font-size: 0.85rem; border-radius: 4px;">Delete</button>
                 </div>
             </form>
         </div>
@@ -536,19 +561,21 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label for="category">Category</label>
-                        <select id="category" required style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;">
+                        <select id="category" required
+                            style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;">
                             <option value="">Select Category...</option>
-                             <option value="Floor Cleaner">Floor Cleaner</option>
-                             <option value="Bathroom Cleaner">Bathroom Cleaner</option>
-                             <option value="Dishwasher">Dishwasher</option>
-                             <option value="Phenyl">Phenyl</option>
-                             <option value="Glass Cleaner">Glass Cleaner</option>
-                             <option value="Handwash">Handwash</option>
+                            <option value="Floor Cleaner">Floor Cleaner</option>
+                            <option value="Bathroom Cleaner">Bathroom Cleaner</option>
+                            <option value="Dishwasher">Dishwasher</option>
+                            <option value="Phenyl">Phenyl</option>
+                            <option value="Glass Cleaner">Glass Cleaner</option>
+                            <option value="Handwash">Handwash</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="productName">Fragrance</label>
-                        <input type="text" id="productName" required placeholder="Enter fragrance..." style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;box-sizing:border-box;">
+                        <input type="text" id="productName" required placeholder="Enter fragrance..."
+                            style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;box-sizing:border-box;">
                     </div>
                 </div>
                 <div class="form-group">
@@ -582,7 +609,8 @@
                     </div>
                     <div class="form-group">
                         <label for="priority">Priority</label>
-                        <select id="priority" required style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;">
+                        <select id="priority" required
+                            style="width:100%;padding:0.75rem;background-color:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:1rem;">
                             <option value="Low">Low</option>
                             <option value="Medium" selected>Medium</option>
                             <option value="High">High</option>
@@ -591,7 +619,9 @@
                 </div>
                 <div style="display: flex; gap: 1rem;">
                     <button type="submit" class="btn-primary" style="flex: 1;" id="saveTaskBtn">Add New Task</button>
-                    <button type="button" class="btn-secondary" style="flex: 1; background-color: var(--card-bg); border: 1px solid var(--border-color);" id="saveAndAddAnotherBtn">Save & Add Another</button>
+                    <button type="button" class="btn-secondary"
+                        style="flex: 1; background-color: var(--card-bg); border: 1px solid var(--border-color);"
+                        id="saveAndAddAnotherBtn">Save & Add Another</button>
                 </div>
             </form>
         </div>
@@ -616,7 +646,8 @@
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="toggle-label">
-                        <input type="checkbox" id="browserNotifToggle" style="width:auto;cursor:pointer;accent-color:var(--accent-color);">
+                        <input type="checkbox" id="browserNotifToggle"
+                            style="width:auto;cursor:pointer;accent-color:var(--accent-color);">
                         <span>Enable Browser Notifications</span>
                     </label>
                 </div>
@@ -631,5 +662,5 @@
     <script src="script.js"></script>
     <script src="chatbot.js"></script>
 </body>
-</html>
 
+</html>

@@ -424,20 +424,25 @@ header {
    =========================== */
 .grid-scroll-container {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 75vh;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background-color: var(--surface-color);
   margin-bottom: 1.5rem;
+  position: relative;
+  scrollbar-width: thin;
 }
 
 .calendar-grid-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 750px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 900px;
 }
 
 .calendar-grid-table th {
-  background-color: var(--surface-color);
+  background-color: #1e293b;
   border-bottom: 1px solid var(--border-color);
   border-right: 1px solid var(--border-color);
   padding: 0.75rem;
@@ -446,6 +451,18 @@ header {
   font-weight: 600;
   font-size: 0.8rem;
   color: var(--text-muted);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.calendar-grid-table th:first-child {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  background-color: #1e293b;
 }
 
 .calendar-grid-table th:last-child {
@@ -532,9 +549,14 @@ header {
   font-size: 0.8rem;
   color: var(--text-primary);
   text-align: center;
-  background-color: rgba(0, 0, 0, 0.15);
+  background-color: #1e293b !important;
   vertical-align: middle !important;
   width: 10% !important;
+  min-width: 75px;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.2);
 }
 
 .date-row-header span {
