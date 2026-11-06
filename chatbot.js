@@ -12,7 +12,7 @@
     const CHATBOT_CONFIG = { // 'smart_nlp' or 'gemini_llm'
         storageKeyHistory: 'worksync_ai_chat_history',
     };
-
+    
     const state = {
         isOpen: false,
         isBusy: false,
